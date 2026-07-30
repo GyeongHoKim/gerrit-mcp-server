@@ -48,6 +48,7 @@ Always go through `just`. The recipes carry the right flags and CI runs the same
 cmd/gerrit-mcp-server/   entry point: flags, environment, wiring
 internal/config/         environment parsing and validation
 internal/gerrit/         the REST client -- HTTP lives here and nowhere else
+internal/render/         Gerrit types to the compact text the model reads
 internal/mcpserver/      tool definitions and registration
 internal/version/        ldflags-injected build stamps
 npm/                     published wrapper package (bin/cli.js dispatches by platform)
@@ -69,7 +70,7 @@ are declared in the file whose endpoints return them -- transport statuses in `c
 argument validation next to the call it guards -- so callers can use `errors.Is`.
 
 **Never return raw Gerrit JSON to the model.** A `ChangeInfo` is enormous and most of it is noise.
-Everything the model sees goes through `internal/mcpserver/render.go`, which compacts it. Tokens
+Everything the model sees goes through `internal/render`, which compacts it. Tokens
 are a budget.
 
 **Write tools are opt-in.** Anything that mutates Gerrit is registered only when
@@ -115,8 +116,9 @@ Do not use `--no-verify`. If a hook is wrong, fix the hook.
 
 - `internal/gerrit`: `httptest.Server` returning recorded Gerrit payloads. Include the `)]}'` prefix
   in fixtures — it is part of what the client must handle.
-- `internal/mcpserver`: golden files for rendered output, so token-bloat regressions are visible in
-  the diff.
+- `internal/render`: golden files written by hand, not captured with `-update`. A golden taken from
+  the implementation records only what the code happens to do.
+- `internal/mcpserver`: tools driven over an in-memory transport against a stub Gerrit.
 - Tests run with `-race` in CI on Linux, macOS and Windows.
 
 ## Releasing

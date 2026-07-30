@@ -2,16 +2,19 @@ package gerrit
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
 	"time"
 )
 
-// errNotImplemented is returned by the stubs until the endpoints are written.
-var errNotImplemented = errors.New("not implemented")
-
 // timestampLayout is Gerrit's timestamp format. It is deliberately not RFC
 // 3339: Gerrit sends "yyyy-mm-dd hh:mm:ss.fffffffff", always in UTC.
-const timestampLayout = "2006-01-02 15:04:05.000000000" //nolint:unused // the implementation commit parses with it
+const timestampLayout = "2006-01-02 15:04:05.000000000"
 
 // Timestamp is a point in time as Gerrit reports it.
 type Timestamp struct {
@@ -20,8 +23,26 @@ type Timestamp struct {
 
 // UnmarshalJSON decodes Gerrit's timestamp format. An empty string decodes to
 // the zero time, which is how optional timestamps arrive.
-func (*Timestamp) UnmarshalJSON(_ []byte) error {
-	return errNotImplemented
+func (t *Timestamp) UnmarshalJSON(data []byte) error {
+	var raw string
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return fmt.Errorf("decoding gerrit timestamp: %w", err)
+	}
+
+	if raw == "" {
+		t.Time = time.Time{}
+
+		return nil
+	}
+
+	parsed, err := time.Parse(timestampLayout, raw)
+	if err != nil {
+		return fmt.Errorf("parsing gerrit timestamp %q: %w", raw, err)
+	}
+
+	t.Time = parsed
+
+	return nil
 }
 
 // AccountInfo identifies a Gerrit user.
@@ -37,8 +58,17 @@ type AccountInfo struct {
 }
 
 // Display returns the most human-friendly identifier available.
-func (AccountInfo) Display() string {
-	return ""
+func (a AccountInfo) Display() string {
+	switch {
+	case a.Name != "":
+		return a.Name
+	case a.Username != "":
+		return a.Username
+	case a.Email != "":
+		return a.Email
+	default:
+		return strconv.Itoa(a.AccountID)
+	}
 }
 
 // ChangeInfo is the part of Gerrit's ChangeInfo the tools actually render.
@@ -87,6 +117,21 @@ var ErrEmptyQuery = errors.New("query must not be empty")
 // "status:open owner:self".
 //
 // A limit of zero leaves the server's default in place.
-func (*Client) QueryChanges(_ context.Context, _ string, _ int) ([]ChangeInfo, error) {
-	return nil, errNotImplemented
+func (c *Client) QueryChanges(ctx context.Context, query string, limit int) ([]ChangeInfo, error) {
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return nil, ErrEmptyQuery
+	}
+
+	values := url.Values{"q": {query}}
+	if limit > 0 {
+		values.Set("n", strconv.Itoa(limit))
+	}
+
+	var changes []ChangeInfo
+	if err := c.do(ctx, http.MethodGet, "/changes/", values, nil, &changes); err != nil {
+		return nil, err
+	}
+
+	return changes, nil
 }

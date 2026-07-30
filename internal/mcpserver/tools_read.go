@@ -2,13 +2,12 @@ package mcpserver
 
 import (
 	"context"
-	"errors"
+	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-)
 
-// errNotImplemented is returned by the stubs until the handlers are written.
-var errNotImplemented = errors.New("not implemented")
+	"github.com/GyeongHoKim/gerrit-mcp-server/internal/render"
+)
 
 // queryChangesInput is the argument schema for the query_changes tool.
 type queryChangesInput struct {
@@ -28,10 +27,17 @@ func registerQueryChanges(s *server, srv *mcp.Server) {
 }
 
 // queryChanges searches for changes and renders the matches.
-func (*server) queryChanges(
-	_ context.Context,
+func (s *server) queryChanges(
+	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ queryChangesInput,
+	in queryChangesInput,
 ) (*mcp.CallToolResult, any, error) {
-	return nil, nil, errNotImplemented
+	changes, err := s.gerrit.QueryChanges(ctx, in.Query, in.Limit)
+	if err != nil {
+		// The SDK turns a returned error into an IsError result, so the model
+		// sees why Gerrit refused instead of the session dying.
+		return nil, nil, fmt.Errorf("querying changes: %w", err)
+	}
+
+	return text(render.Changes(changes)), nil, nil
 }
