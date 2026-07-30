@@ -9,6 +9,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/GyeongHoKim/gerrit-mcp-server/internal/gerrit"
+	"github.com/GyeongHoKim/gerrit-mcp-server/internal/version"
 )
 
 // ServerName is how this server identifies itself to MCP clients.
@@ -29,7 +30,7 @@ var writeTools []toolRegistrar
 
 // server carries what the tool handlers need.
 type server struct {
-	gerrit *gerrit.Client //nolint:unused // the first tool commit reads it
+	gerrit *gerrit.Client
 }
 
 // New builds an MCP server exposing the Gerrit tools.
@@ -37,14 +38,33 @@ type server struct {
 // Read tools are always registered. Write tools are registered only when
 // allowWrite is true, so an agent cannot abandon a change on a host the
 // operator meant to expose read-only.
-func New(_ *gerrit.Client, _ bool) *mcp.Server {
-	return mcp.NewServer(&mcp.Implementation{}, nil)
+func New(client *gerrit.Client, allowWrite bool) *mcp.Server {
+	srv := mcp.NewServer(&mcp.Implementation{
+		Name:    ServerName,
+		Version: version.Version,
+	}, nil)
+
+	s := &server{gerrit: client}
+
+	for _, register := range readTools {
+		register(s, srv)
+	}
+
+	if allowWrite {
+		for _, register := range writeTools {
+			register(s, srv)
+		}
+	}
+
+	return srv
 }
 
 // text wraps a rendered string as a tool result.
 //
 // Every tool answers through here, so none of them can hand the model raw
 // Gerrit JSON by accident.
-func text(_ string) *mcp.CallToolResult {
-	return &mcp.CallToolResult{}
+func text(body string) *mcp.CallToolResult {
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{&mcp.TextContent{Text: body}},
+	}
 }
