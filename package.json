@@ -1,0 +1,19 @@
+{
+  "name": "gerrit-mcp-server-dev",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Development tooling for gerrit-mcp-server. Never published -- the published package lives in npm/.",
+  "license": "Elastic-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GyeongHoKim/gerrit-mcp-server.git"
+  },
+  "engines": {
+    "node": ">=22.14.0"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^21.2.1",
+    "@commitlint/config-conventional": "^21.2.0"
+  }
+}

@@ -1,0 +1,38 @@
+[
+  {
+    // The server reads JSON-RPC from stdin. Send it a request such as:
+    //   {"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}
+    "label": "Run server (stdio)",
+    "adapter": "Delve",
+    "request": "launch",
+    "mode": "debug",
+    "program": "$ZED_WORKTREE_ROOT/cmd/gerrit-mcp-server",
+    "cwd": "$ZED_WORKTREE_ROOT"
+  },
+  {
+    "label": "Run server (--version)",
+    "adapter": "Delve",
+    "request": "launch",
+    "mode": "debug",
+    "program": "$ZED_WORKTREE_ROOT/cmd/gerrit-mcp-server",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "args": ["--version"]
+  },
+  {
+    // Usually the most useful one: let your MCP client spawn the server, then
+    // attach to it and break while the agent is driving.
+    "label": "Attach to running server",
+    "adapter": "Delve",
+    "request": "attach",
+    "mode": "local",
+    "processId": 0
+  },
+  {
+    "label": "Debug tests in current package",
+    "adapter": "Delve",
+    "request": "launch",
+    "mode": "test",
+    "program": "$ZED_DIRNAME",
+    "cwd": "$ZED_WORKTREE_ROOT"
+  }
+]

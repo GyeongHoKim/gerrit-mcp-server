@@ -1,0 +1,27 @@
+# Toolchain for gerrit-mcp-server.
+#
+# This file is the single source of truth for tool versions -- local development,
+# git hooks, and CI (via jdx/mise-action) all resolve versions from here.
+#
+#   mise install     install everything pinned below
+#   just --list      see available development tasks
+
+[tools]
+go = "1.26.5"
+golangci-lint = "2.12.2"
+just = "1.57.0"
+goreleaser = "2.17.1"
+lefthook = "2.1.10"
+
+# Node is only used for commitlint and npm publishing, never at runtime.
+# Pinned to the Active LTS line: npm trusted publishing requires Node >= 22.14.0
+# and npm >= 11.5.1, both satisfied here.
+node = "24.18.1"
+
+# Note: CGO_ENABLED is deliberately not set here. Released binaries are static,
+# but goreleaser sets CGO_ENABLED=0 per build -- setting it globally would also
+# apply to `go test -race`, which requires cgo and would fail outright.
+
+[settings]
+# Never let a stray .go-version or .node-version shadow the pins above.
+idiomatic_version_file_enable_tools = []

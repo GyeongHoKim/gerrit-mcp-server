@@ -1,0 +1,77 @@
+[
+  {
+    "label": "just: ci",
+    "command": "just",
+    "args": ["ci"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": false,
+    "reveal": "always",
+    "tags": ["go-check"]
+  },
+  {
+    "label": "just: build",
+    "command": "just",
+    "args": ["build"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "just: test",
+    "command": "just",
+    "args": ["test"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "just: test-race",
+    "command": "just",
+    "args": ["test-race"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "just: lint",
+    "command": "just",
+    "args": ["lint"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "just: lint-fix",
+    "command": "just",
+    "args": ["lint-fix"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "just: cover-html",
+    "command": "just",
+    "args": ["cover-html"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "just: inspect",
+    "command": "just",
+    "args": ["inspect"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "go: test current file",
+    "command": "go",
+    "args": ["test", "-race", "-run", "$ZED_SYMBOL", "./$ZED_RELATIVE_FILE/.."],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": false,
+    "reveal": "always",
+    "tags": ["go-test"]
+  }
+]

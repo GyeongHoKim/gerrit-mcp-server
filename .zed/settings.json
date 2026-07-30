@@ -1,0 +1,53 @@
+{
+  // Go, YAML and JSON are built in. These two are not.
+  // If Zed ignores this in project scope, put the same block in your user
+  // settings (cmd-shift-p -> "zed: open settings").
+  "auto_install_extensions": {
+    "toml": true,
+    "just": true
+  },
+
+  "lsp": {
+    "gopls": {
+      "initialization_options": {
+        "gofumpt": true,
+        "staticcheck": true,
+        "usePlaceholders": true,
+        "hints": {
+          "assignVariableTypes": true,
+          "compositeLiteralFields": true,
+          "constantValues": true,
+          "functionTypeParameters": true,
+          "parameterNames": true,
+          "rangeVariableTypes": true
+        },
+        "codelenses": {
+          "generate": true,
+          "test": true,
+          "tidy": true
+        }
+      }
+    }
+  },
+
+  "languages": {
+    "Go": {
+      "format_on_save": "on",
+      "code_actions_on_format": {
+        "source.organizeImports": true
+      }
+    }
+  },
+
+  "file_scan_exclusions": [
+    "**/.git",
+    "**/bin",
+    "**/dist",
+    "**/doc",
+    "**/node_modules",
+    "**/tmp"
+  ],
+
+  "ensure_final_newline_on_save": true,
+  "remove_trailing_whitespace_on_save": true
+}

@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # mise refuses to read a config it has not been told to trust, and there is
+  # no interactive prompt on a runner.
+  MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}
+
+jobs:
+  quality:
+    name: Lint and vet
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: jdx/mise-action@v4
+
+      - run: npm ci
+
+      # Exactly what `just ci` runs locally, so the two cannot drift.
+      - run: just ci
+
+  test:
+    name: Test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: jdx/mise-action@v4
+
+      - run: just test-race
+
+      - run: just build
+
+      # `clean` is the one recipe with separate [unix] and [windows] bodies.
+      # Running it here is how we find out the Windows branch still works.
+      - run: just clean
+
+  # The commit-msg hook in lefthook.yml is the primary check -- it fails fast,
+  # at commit time, where it is cheap to fix. This job is the backstop, because
+  # a hook cannot be enforced:
+  #
+  #   - .git/hooks is not versioned, so a fresh clone has no hooks at all until
+  #     someone runs `just setup`
+  #   - `git commit --no-verify` skips it
+  #   - web UI edits and bot commits never run it
+  #
+  # We merge (not squash), so every one of these commits lands on main and
+  # feeds the goreleaser changelog, which filters on conventional-commit
+  # prefixes. A malformed message here quietly corrupts release notes later.
+  commits:
+    name: Commit messages
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: jdx/mise-action@v4
+
+      - run: npm ci
+
+      - name: Lint commit messages
+        run: >-
+          npx commitlint
+          --from ${{ github.event.pull_request.base.sha }}
+          --to ${{ github.event.pull_request.head.sha }}
+          --verbose

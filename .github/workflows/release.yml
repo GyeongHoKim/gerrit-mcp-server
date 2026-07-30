@@ -1,0 +1,59 @@
+name: Release
+
+# The filename matters. Every one of the six npm packages has a trusted
+# publisher on npmjs.com naming this workflow, so renaming this file breaks
+# publishing until all six are reconfigured.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write # create the GitHub Release
+  id-token: write # mint the OIDC token npm trusted publishing needs
+
+env:
+  MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}
+
+jobs:
+  release:
+    name: Build and publish
+    # Trusted publishing only works from cloud-hosted runners.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # goreleaser needs the full history to build the changelog.
+          fetch-depth: 0
+
+      - uses: jdx/mise-action@v4
+
+      - name: Require npm with trusted publishing support
+        run: node scripts/require-npm-version.mjs 11.5.1
+
+      - run: npm ci
+
+      - name: Build binaries and publish the GitHub release
+        run: goreleaser release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Assemble the npm packages
+        run: node scripts/build-npm-packages.mjs "${GITHUB_REF_NAME}"
+
+      # Platform packages go first: the wrapper pins them by exact version, so
+      # publishing the wrapper first would leave a window where installing it
+      # fails.
+      #
+      # There is deliberately no NPM_TOKEN or NODE_AUTH_TOKEN here. If npm
+      # finds either, it uses the legacy token path and trusted publishing is
+      # silently skipped.
+      - name: Publish platform packages
+        run: |
+          for package in dist/npm/gerrit-mcp-server-*/; do
+            echo "publishing ${package}"
+            npm publish "${package}" --provenance --access public
+          done
+
+      - name: Publish the wrapper package
+        run: npm publish dist/npm/gerrit-mcp-server --provenance --access public

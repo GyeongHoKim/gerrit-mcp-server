@@ -1,0 +1,18 @@
+{
+  "recommendations": [
+    // Go language support: gopls, dlv, test runner, coverage.
+    "golang.go",
+
+    // justfile syntax and recipe running.
+    "nefrob.vscode-just-syntax",
+
+    // mise.toml, .goreleaser.yaml neighbours, and Codex's config.toml.
+    "tamasfe.even-better-toml",
+
+    // .golangci.yml, lefthook.yml, .goreleaser.yaml, workflows.
+    "redhat.vscode-yaml",
+
+    // Workflow authoring and run status for .github/workflows.
+    "github.vscode-github-actions"
+  ]
+}

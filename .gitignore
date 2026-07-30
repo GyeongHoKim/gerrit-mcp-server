@@ -1,0 +1,45 @@
+# Build output
+/bin/
+/dist/
+*.exe
+*.test
+coverage.out
+coverage.html
+
+# Node (commitlint + npm publishing tooling only)
+node_modules/
+*.tgz
+
+# mise / local environment
+.mise.local.toml
+mise.local.toml
+.env
+.env.*
+!.env.example
+
+# Local research artifacts, not part of the project.
+/doc/
+/tmp/
+
+# Secrets. An MCP client config carries a Gerrit auth token in plain text --
+# never let one reach the repository.
+.mcp.json
+*.local.json
+
+# Editors. Shared project configuration is tracked so everyone gets the same
+# tasks and debug targets; anything else in these directories is personal.
+.idea/
+
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/tasks.json
+
+.zed/*
+!.zed/settings.json
+!.zed/tasks.json
+!.zed/debug.json
+
+.DS_Store
+Thumbs.db
