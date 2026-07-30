@@ -23,7 +23,9 @@ const ServerName = "gerrit"
 type toolRegistrar func(*server, *mcp.Server)
 
 // readTools never modify Gerrit and are registered unconditionally.
-var readTools []toolRegistrar
+var readTools = []toolRegistrar{
+	registerQueryChanges,
+}
 
 // writeTools modify Gerrit and are registered only when writes are allowed.
 var writeTools []toolRegistrar
