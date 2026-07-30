@@ -92,14 +92,30 @@ linters:
   settings:
     depguard:
       rules:
+        # Shipped code: the MCP SDK is the only external module allowed.
         main:
           list-mode: strict
           files:
             - $all
+            - "!$test"
           allow:
             - $gostd
             - github.com/modelcontextprotocol/go-sdk
             - github.com/GyeongHoKim/gerrit-mcp-server
+          deny:
+            - pkg: math/rand
+              desc: use math/rand/v2
+        # Tests may also use go-cmp. It never reaches the binary, and its
+        # diffs are worth far more than hand-rolled reflect.DeepEqual output.
+        tests:
+          list-mode: strict
+          files:
+            - $test
+          allow:
+            - $gostd
+            - github.com/modelcontextprotocol/go-sdk
+            - github.com/GyeongHoKim/gerrit-mcp-server
+            - github.com/google/go-cmp
           deny:
             - pkg: math/rand
               desc: use math/rand/v2
