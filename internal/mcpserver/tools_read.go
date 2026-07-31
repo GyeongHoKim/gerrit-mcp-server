@@ -2,7 +2,6 @@ package mcpserver
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -182,13 +181,15 @@ func registerListDraftComments(s *server, srv *mcp.Server) {
 }
 
 // listDraftComments lists the calling account's unpublished drafts.
-func (*server) listDraftComments(
-	_ context.Context,
+func (s *server) listDraftComments(
+	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ changeIDInput,
+	in changeIDInput,
 ) (*mcp.CallToolResult, any, error) {
-	return nil, nil, errStubbed
-}
+	byFile, err := s.gerrit.ListDraftComments(ctx, in.ChangeID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("listing draft comments on %s: %w", in.ChangeID, err)
+	}
 
-// errStubbed is returned by unimplemented handlers.
-var errStubbed = errors.New("not implemented")
+	return text(render.Drafts(byFile)), nil, nil
+}
