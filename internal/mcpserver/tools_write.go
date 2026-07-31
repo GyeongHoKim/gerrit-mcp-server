@@ -2,7 +2,6 @@ package mcpserver
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -250,12 +249,16 @@ func registerSetReadyForReview(s *server, srv *mcp.Server) {
 }
 
 // setReadyForReview marks a change ready.
-func (*server) setReadyForReview(
-	_ context.Context,
+func (s *server) setReadyForReview(
+	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ changeMessageInput,
+	in changeMessageInput,
 ) (*mcp.CallToolResult, any, error) {
-	return nil, nil, errStubbed
+	if err := s.gerrit.SetReadyForReview(ctx, in.ChangeID, in.Message); err != nil {
+		return nil, nil, fmt.Errorf("marking %s ready for review: %w", in.ChangeID, err)
+	}
+
+	return text(render.ReadyForReviewSet(in.ChangeID)), nil, nil
 }
 
 // registerSetWorkInProgress installs the set_work_in_progress tool.
@@ -269,13 +272,14 @@ func registerSetWorkInProgress(s *server, srv *mcp.Server) {
 }
 
 // setWorkInProgress marks a change work-in-progress.
-func (*server) setWorkInProgress(
-	_ context.Context,
+func (s *server) setWorkInProgress(
+	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ changeMessageInput,
+	in changeMessageInput,
 ) (*mcp.CallToolResult, any, error) {
-	return nil, nil, errStubbed
-}
+	if err := s.gerrit.SetWorkInProgress(ctx, in.ChangeID, in.Message); err != nil {
+		return nil, nil, fmt.Errorf("marking %s work-in-progress: %w", in.ChangeID, err)
+	}
 
-// errStubbed is returned by unimplemented handlers.
-var errStubbed = errors.New("not implemented")
+	return text(render.WorkInProgressSet(in.ChangeID)), nil, nil
+}

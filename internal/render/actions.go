@@ -10,11 +10,11 @@ func TopicSet(changeID, topic string) string {
 }
 
 // ReadyForReviewSet confirms a change is asking for review.
-func ReadyForReviewSet(_ string) string {
-	return ""
+func ReadyForReviewSet(changeID string) string {
+	return "Change " + changeID + " is ready for review; its reviewers have been notified.\n"
 }
 
 // WorkInProgressSet confirms a change is no longer asking for review.
-func WorkInProgressSet(_ string) string {
-	return ""
+func WorkInProgressSet(changeID string) string {
+	return "Change " + changeID + " is marked work-in-progress and no longer asks for review.\n"
 }

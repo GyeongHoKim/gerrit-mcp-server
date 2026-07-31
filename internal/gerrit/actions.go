@@ -2,7 +2,6 @@ package gerrit
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"strings"
 )
@@ -33,9 +32,6 @@ func (c *Client) SetTopic(ctx context.Context, changeID, topic string) error {
 	return c.do(ctx, http.MethodPut, path, nil, TopicInput{Topic: topic}, nil)
 }
 
-// errStubbed is returned by unimplemented endpoints.
-var errStubbed = errors.New("not implemented")
-
 // MessageInput carries the optional note Gerrit attaches to a state change.
 type MessageInput struct {
 	// Message is posted on the change alongside the action.
@@ -44,11 +40,24 @@ type MessageInput struct {
 
 // SetReadyForReview takes a change out of work-in-progress and notifies its
 // reviewers.
-func (*Client) SetReadyForReview(_ context.Context, _, _ string) error {
-	return errStubbed
+func (c *Client) SetReadyForReview(ctx context.Context, changeID, message string) error {
+	return c.postMessage(ctx, changeID, "/ready", message)
 }
 
 // SetWorkInProgress marks a change as not yet asking for review.
-func (*Client) SetWorkInProgress(_ context.Context, _, _ string) error {
-	return errStubbed
+func (c *Client) SetWorkInProgress(ctx context.Context, changeID, message string) error {
+	return c.postMessage(ctx, changeID, "/wip", message)
+}
+
+// postMessage posts an action that takes nothing but an optional note and
+// answers with no body.
+func (c *Client) postMessage(ctx context.Context, changeID, suffix, message string) error {
+	changeID = strings.TrimSpace(changeID)
+	if changeID == "" {
+		return ErrEmptyChangeID
+	}
+
+	in := MessageInput{Message: strings.TrimSpace(message)}
+
+	return c.do(ctx, http.MethodPost, changePath(changeID, suffix), nil, in, nil)
 }
