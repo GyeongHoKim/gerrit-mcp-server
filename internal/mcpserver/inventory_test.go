@@ -7,7 +7,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-// The tool names this server promises, in the order ListTools returns them.
+// The tool names this server promises, sorted -- which is how toolNames hands
+// them back, not the order ListTools happens to use.
 //
 // This is a contract rather than a discovery: the names appear in README.md
 // and in users' MCP client configs, so renaming one is a breaking change and

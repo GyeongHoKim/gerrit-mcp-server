@@ -243,8 +243,15 @@ func TestDestructiveToolsCarryTheDestructiveHint(t *testing.T) {
 	}
 
 	// A client may warn or confirm before running a destructive tool, but only
-	// if we tell it which ones those are.
-	destructive := []string{"delete_draft_comment"}
+	// if we tell it which ones those are. Every tool that discards work or
+	// undoes a submission belongs here.
+	destructive := []string{
+		"abandon_change",
+		"delete_draft_comment",
+		"delete_draft_comments",
+		"revert_change",
+		"revert_submission",
+	}
 
 	for _, name := range destructive {
 		index := slices.IndexFunc(listed.Tools, func(tool *mcp.Tool) bool { return tool.Name == name })

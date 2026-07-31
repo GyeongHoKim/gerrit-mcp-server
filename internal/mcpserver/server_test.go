@@ -101,8 +101,8 @@ func TestNewAdvertisesServerIdentity(t *testing.T) {
 func TestNewServesToolListing(t *testing.T) {
 	t.Parallel()
 
-	// The set is empty until the first tool lands; what matters here is that
-	// tools/list is answered at all.
+	// What the set contains is pinned in inventory_test.go; what matters here
+	// is that tools/list is answered at all.
 	if _, err := connect(t, New(newGerrit(t), false)).ListTools(t.Context(), nil); err != nil {
 		t.Fatalf("listing tools: %v", err)
 	}
