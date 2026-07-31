@@ -2,6 +2,7 @@ package mcpserver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -216,3 +217,34 @@ func (s *server) changesSubmittedTogether(
 
 	return text(render.SubmittedTogether(changes)), nil, nil
 }
+
+// suggestReviewersInput is the argument schema for the suggest_reviewers tool.
+type suggestReviewersInput struct {
+	// ChangeID identifies the change.
+	ChangeID string `json:"change_id" jsonschema:"the change number (12345) or the triplet project~branch~Change-Id"`
+	// Query narrows the suggestions.
+	Query string `json:"query,omitempty" jsonschema:"text matched against names, emails and group names; leave unset for Gerrit's own ranking"`
+	// Limit caps the number of suggestions.
+	Limit int `json:"limit,omitempty" jsonschema:"maximum number of suggestions to return"`
+}
+
+// registerSuggestReviewers installs the suggest_reviewers tool.
+func registerSuggestReviewers(s *server, srv *mcp.Server) {
+	mcp.AddTool(srv, &mcp.Tool{
+		Name:        "suggest_reviewers",
+		Description: "Ask Gerrit who could review a change. Returns both people and groups.",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, s.suggestReviewers)
+}
+
+// suggestReviewers asks Gerrit for reviewer suggestions.
+func (*server) suggestReviewers(
+	_ context.Context,
+	_ *mcp.CallToolRequest,
+	_ suggestReviewersInput,
+) (*mcp.CallToolResult, any, error) {
+	return nil, nil, errStubbed
+}
+
+// errStubbed is returned by unimplemented handlers.
+var errStubbed = errors.New("not implemented")

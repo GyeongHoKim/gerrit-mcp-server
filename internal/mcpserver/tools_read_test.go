@@ -468,3 +468,43 @@ func TestChangesSubmittedTogetherTool(t *testing.T) {
 		t.Errorf("output = %q, want it to say the change submits alone", got)
 	}
 }
+
+func TestSuggestReviewersTool(t *testing.T) {
+	t.Parallel()
+
+	const body = `[
+	  {"account": {"_account_id": 2, "name": "Bob Brown", "email": "bob@example.com"}},
+	  {"group": {"id": "abc", "name": "reviewers-core"}, "count": 12}
+	]`
+
+	var gotQuery url.Values
+
+	srv := newServerAgainst(t, func(w http.ResponseWriter, r *http.Request) {
+		gotQuery = r.URL.Query()
+
+		if _, err := w.Write([]byte(")]}'\n" + body)); err != nil {
+			t.Errorf("writing stub response: %v", err)
+		}
+	})
+
+	result := callTool(t, srv, "suggest_reviewers", map[string]any{
+		"change_id": "12345",
+		"query":     "bo",
+	})
+
+	if result.IsError {
+		t.Fatalf("suggest_reviewers reported an error: %s", resultText(t, result))
+	}
+
+	if want := "bo"; gotQuery.Get("q") != want {
+		t.Errorf("q = %q, want %q", gotQuery.Get("q"), want)
+	}
+
+	got := resultText(t, result)
+
+	for _, want := range []string{"Bob Brown", "bob@example.com", "reviewers-core", "12 members"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("output does not mention %q:\n%s", want, got)
+		}
+	}
+}
