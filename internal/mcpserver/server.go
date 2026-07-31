@@ -26,6 +26,7 @@ type toolRegistrar func(*server, *mcp.Server)
 var readTools = []toolRegistrar{
 	registerQueryChanges,
 	registerGetChangeDetails,
+	registerGetCommitMessage,
 }
 
 // writeTools modify Gerrit and are registered only when writes are allowed.

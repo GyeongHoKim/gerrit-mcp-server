@@ -103,3 +103,38 @@ func TestChangeDetailSortsLabelsDeterministically(t *testing.T) {
 		}
 	}
 }
+
+func TestCommitMessage(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		message *gerrit.CommitMessageInfo
+		want    string
+	}{
+		"passed through unchanged": {
+			message: &gerrit.CommitMessageInfo{
+				Subject:     "Add feature X",
+				FullMessage: "Add feature X\n\nFeature X helps with foo.\n\nBug: 123\nChange-Id: I1039447\n",
+			},
+			want: "Add feature X\n\nFeature X helps with foo.\n\nBug: 123\nChange-Id: I1039447\n",
+		},
+		"a missing trailing newline is added": {
+			message: &gerrit.CommitMessageInfo{Subject: "Terse", FullMessage: "Terse"},
+			want:    "Terse\n",
+		},
+		"an empty message falls back to the subject": {
+			message: &gerrit.CommitMessageInfo{Subject: "Only a subject"},
+			want:    "Only a subject\n",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := render.CommitMessage(test.message); got != test.want {
+				t.Errorf("CommitMessage() = %q, want %q", got, test.want)
+			}
+		})
+	}
+}

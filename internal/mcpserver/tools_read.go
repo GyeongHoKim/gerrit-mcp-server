@@ -2,6 +2,7 @@ package mcpserver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -70,3 +71,24 @@ func (s *server) getChangeDetails(
 
 	return text(render.ChangeDetail(detail)), nil, nil
 }
+
+// registerGetCommitMessage installs the get_commit_message tool.
+func registerGetCommitMessage(s *server, srv *mcp.Server) {
+	mcp.AddTool(srv, &mcp.Tool{
+		Name:        "get_commit_message",
+		Description: "Retrieve the full commit message of a Gerrit change's current patch set.",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, s.getCommitMessage)
+}
+
+// getCommitMessage retrieves the commit message of a change.
+func (*server) getCommitMessage(
+	_ context.Context,
+	_ *mcp.CallToolRequest,
+	_ changeIDInput,
+) (*mcp.CallToolResult, any, error) {
+	return nil, nil, errStubbed
+}
+
+// errStubbed is returned by unimplemented handlers.
+var errStubbed = errors.New("not implemented")

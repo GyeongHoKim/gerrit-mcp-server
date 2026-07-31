@@ -229,3 +229,43 @@ func TestGetChangeDetailsToolIsReadOnly(t *testing.T) {
 		t.Error("get_change_details is missing the read-only annotation")
 	}
 }
+
+func TestGetCommitMessageTool(t *testing.T) {
+	t.Parallel()
+
+	const body = `{
+	  "subject": "Add feature X",
+	  "full_message": "Add feature X\n\nFeature X helps with foo.\n\nBug: 123\n",
+	  "footers": {"Bug": "123"}
+	}`
+
+	var gotPath string
+
+	srv := newServerAgainst(t, func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.EscapedPath()
+
+		if _, err := w.Write([]byte(")]}'\n" + body)); err != nil {
+			t.Errorf("writing stub response: %v", err)
+		}
+	})
+
+	result := callTool(t, srv, "get_commit_message", map[string]any{"change_id": "12345"})
+
+	if result.IsError {
+		t.Fatalf("get_commit_message reported an error: %s", resultText(t, result))
+	}
+
+	if want := "/a/changes/12345/message"; gotPath != want {
+		t.Errorf("path = %q, want %q", gotPath, want)
+	}
+
+	got := resultText(t, result)
+
+	if !strings.Contains(got, "Feature X helps with foo.") {
+		t.Errorf("output lost the message body:\n%s", got)
+	}
+
+	if strings.Contains(got, "full_message") {
+		t.Errorf("output leaks raw Gerrit JSON:\n%s", got)
+	}
+}

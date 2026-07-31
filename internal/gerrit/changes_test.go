@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -337,5 +338,58 @@ func TestGetChangeMapsNotFound(t *testing.T) {
 
 	if _, err := client.GetChange(t.Context(), "99999"); !errors.Is(err, ErrNotFound) {
 		t.Errorf("GetChange() error = %v, want ErrNotFound", err)
+	}
+}
+
+func TestGetCommitMessage(t *testing.T) {
+	t.Parallel()
+
+	const body = `{
+	  "subject": "Add feature X",
+	  "full_message": "Add feature X\n\nFeature X helps with foo.\n\nBug: 123\nChange-Id: I1039447\n",
+	  "footers": {"Bug": "123", "Change-Id": "I1039447"}
+	}`
+
+	var gotPath string
+
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.EscapedPath()
+
+		if _, err := w.Write([]byte(xssiPrefix + "\n" + body)); err != nil {
+			t.Errorf("writing test response: %v", err)
+		}
+	})
+
+	got, err := client.GetCommitMessage(t.Context(), "a/b~main~I1")
+	if err != nil {
+		t.Fatalf("GetCommitMessage() returned an unexpected error: %v", err)
+	}
+
+	if want := "/a/changes/a%2Fb~main~I1/message"; gotPath != want {
+		t.Errorf("path = %q, want %q", gotPath, want)
+	}
+
+	if want := "Add feature X"; got.Subject != want {
+		t.Errorf("Subject = %q, want %q", got.Subject, want)
+	}
+
+	if !strings.Contains(got.FullMessage, "Feature X helps with foo.") {
+		t.Errorf("FullMessage = %q, want the body to survive", got.FullMessage)
+	}
+
+	if want := "123"; got.Footers["Bug"] != want {
+		t.Errorf("Footers[Bug] = %q, want %q", got.Footers["Bug"], want)
+	}
+}
+
+func TestGetCommitMessageRejectsEmptyID(t *testing.T) {
+	t.Parallel()
+
+	client := newTestClient(t, func(_ http.ResponseWriter, _ *http.Request) {
+		t.Error("GetCommitMessage() reached the server, want it to refuse before that")
+	})
+
+	if _, err := client.GetCommitMessage(t.Context(), ""); !errors.Is(err, ErrEmptyChangeID) {
+		t.Errorf("GetCommitMessage() error = %v, want ErrEmptyChangeID", err)
 	}
 }

@@ -121,3 +121,12 @@ func writeReviewers(out *strings.Builder, reviewers map[string][]gerrit.AccountI
 		out.WriteString("\n")
 	}
 }
+
+// CommitMessage renders a commit message.
+//
+// The message is already prose written for humans, so it is passed through
+// unchanged apart from guaranteeing the trailing newline that Gerrit does not
+// always send.
+func CommitMessage(_ *gerrit.CommitMessageInfo) string {
+	return ""
+}

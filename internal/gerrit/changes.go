@@ -200,3 +200,22 @@ func (c *Client) GetChange(ctx context.Context, changeID string) (*ChangeDetail,
 
 	return &detail, nil
 }
+
+// CommitMessageInfo is a change's commit message with its footers parsed out.
+type CommitMessageInfo struct {
+	// Footers maps footer keys such as Bug or Change-Id to their values.
+	Footers map[string]string `json:"footers,omitempty"`
+	// Subject is the first line of the message.
+	Subject string `json:"subject"`
+	// FullMessage is the complete commit message, subject included.
+	FullMessage string `json:"full_message"`
+}
+
+// GetCommitMessage retrieves the commit message of a change's current patch
+// set.
+func (*Client) GetCommitMessage(_ context.Context, _ string) (*CommitMessageInfo, error) {
+	return nil, errStubbed
+}
+
+// errStubbed is returned by unimplemented endpoints.
+var errStubbed = errors.New("not implemented")
