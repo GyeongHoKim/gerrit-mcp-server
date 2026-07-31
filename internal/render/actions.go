@@ -49,11 +49,45 @@ func ChangeReverted(changeID string, revert *gerrit.ChangeInfo) string {
 }
 
 // ChangeCreated names a newly opened change.
-func ChangeCreated(_ *gerrit.ChangeInfo) string {
-	return ""
+func ChangeCreated(change *gerrit.ChangeInfo) string {
+	var out strings.Builder
+
+	out.WriteString("Created change ")
+	out.WriteString(strconv.Itoa(change.Number))
+	out.WriteString(".\n\n")
+	writeChange(&out, change)
+	out.WriteString("\nThe change is empty until an edit is published to it.\n")
+
+	return out.String()
 }
 
 // SubmissionReverted names the changes created to undo a submission.
-func SubmissionReverted(_ string, _ *gerrit.RevertSubmissionInfo) string {
-	return ""
+func SubmissionReverted(changeID string, reverts *gerrit.RevertSubmissionInfo) string {
+	changes := reverts.RevertChanges
+	if len(changes) == 0 {
+		return "Gerrit created no reverts for the submission containing change " + changeID + ".\n"
+	}
+
+	var out strings.Builder
+
+	out.WriteString("Created ")
+	out.WriteString(strconv.Itoa(len(changes)))
+	out.WriteString(" change")
+
+	if len(changes) != 1 {
+		out.WriteString("s")
+	}
+
+	out.WriteString(" reverting the submission containing ")
+	out.WriteString(changeID)
+	out.WriteString(".\n")
+
+	for i := range changes {
+		out.WriteString("\n")
+		writeChange(&out, &changes[i])
+	}
+
+	out.WriteString("\nEvery revert still has to be reviewed and submitted.\n")
+
+	return out.String()
 }

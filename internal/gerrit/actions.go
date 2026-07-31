@@ -94,9 +94,6 @@ func (c *Client) postForChange(ctx context.Context, changeID, suffix, message st
 	return &change, nil
 }
 
-// errStubbed is returned by unimplemented endpoints.
-var errStubbed = errors.New("not implemented")
-
 // ChangeInput creates a change.
 type ChangeInput struct {
 	// Project is the repository the change targets.
@@ -118,8 +115,21 @@ var ErrIncompleteChange = errors.New("project, branch and subject are all requir
 //
 // The change has no content until an edit is published to it; this only
 // creates the review to hang that on.
-func (*Client) CreateChange(_ context.Context, _ *ChangeInput) (*ChangeInfo, error) {
-	return nil, errStubbed
+func (c *Client) CreateChange(ctx context.Context, in *ChangeInput) (*ChangeInfo, error) {
+	in.Project = strings.TrimSpace(in.Project)
+	in.Branch = strings.TrimSpace(in.Branch)
+	in.Subject = strings.TrimSpace(in.Subject)
+
+	if in.Project == "" || in.Branch == "" || in.Subject == "" {
+		return nil, ErrIncompleteChange
+	}
+
+	var change ChangeInfo
+	if err := c.do(ctx, http.MethodPost, "/changes/", nil, in, &change); err != nil {
+		return nil, err
+	}
+
+	return &change, nil
 }
 
 // RevertSubmissionInfo names the changes created to undo a submission.
@@ -130,6 +140,21 @@ type RevertSubmissionInfo struct {
 
 // RevertSubmission creates a change reverting every change submitted
 // alongside this one.
-func (*Client) RevertSubmission(_ context.Context, _, _ string) (*RevertSubmissionInfo, error) {
-	return nil, errStubbed
+func (c *Client) RevertSubmission(
+	ctx context.Context,
+	changeID, message string,
+) (*RevertSubmissionInfo, error) {
+	changeID = strings.TrimSpace(changeID)
+	if changeID == "" {
+		return nil, ErrEmptyChangeID
+	}
+
+	in := MessageInput{Message: strings.TrimSpace(message)}
+
+	var reverts RevertSubmissionInfo
+	if err := c.do(ctx, http.MethodPost, changePath(changeID, "/revert_submission"), nil, in, &reverts); err != nil {
+		return nil, err
+	}
+
+	return &reverts, nil
 }

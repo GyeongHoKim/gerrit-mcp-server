@@ -2,7 +2,6 @@ package mcpserver
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -362,12 +361,23 @@ func registerCreateChange(s *server, srv *mcp.Server) {
 }
 
 // createChange opens a new change.
-func (*server) createChange(
-	_ context.Context,
+func (s *server) createChange(
+	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ createChangeInput,
+	in createChangeInput,
 ) (*mcp.CallToolResult, any, error) {
-	return nil, nil, errStubbed
+	change, err := s.gerrit.CreateChange(ctx, &gerrit.ChangeInput{
+		Project:        in.Project,
+		Branch:         in.Branch,
+		Subject:        in.Subject,
+		Topic:          in.Topic,
+		WorkInProgress: in.WorkInProgress,
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("creating a change on %s: %w", in.Project, err)
+	}
+
+	return text(render.ChangeCreated(change)), nil, nil
 }
 
 // registerRevertSubmission installs the revert_submission tool.
@@ -383,13 +393,15 @@ func registerRevertSubmission(s *server, srv *mcp.Server) {
 }
 
 // revertSubmission reverts a whole submission.
-func (*server) revertSubmission(
-	_ context.Context,
+func (s *server) revertSubmission(
+	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ changeMessageInput,
+	in changeMessageInput,
 ) (*mcp.CallToolResult, any, error) {
-	return nil, nil, errStubbed
-}
+	reverts, err := s.gerrit.RevertSubmission(ctx, in.ChangeID, in.Message)
+	if err != nil {
+		return nil, nil, fmt.Errorf("reverting the submission containing %s: %w", in.ChangeID, err)
+	}
 
-// errStubbed is returned by unimplemented handlers.
-var errStubbed = errors.New("not implemented")
+	return text(render.SubmissionReverted(in.ChangeID, reverts)), nil, nil
+}
