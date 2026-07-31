@@ -2,7 +2,6 @@ package mcpserver
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -238,13 +237,15 @@ func registerSuggestReviewers(s *server, srv *mcp.Server) {
 }
 
 // suggestReviewers asks Gerrit for reviewer suggestions.
-func (*server) suggestReviewers(
-	_ context.Context,
+func (s *server) suggestReviewers(
+	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ suggestReviewersInput,
+	in suggestReviewersInput,
 ) (*mcp.CallToolResult, any, error) {
-	return nil, nil, errStubbed
-}
+	suggestions, err := s.gerrit.SuggestReviewers(ctx, in.ChangeID, in.Query, in.Limit)
+	if err != nil {
+		return nil, nil, fmt.Errorf("suggesting reviewers for %s: %w", in.ChangeID, err)
+	}
 
-// errStubbed is returned by unimplemented handlers.
-var errStubbed = errors.New("not implemented")
+	return text(render.Reviewers(suggestions)), nil, nil
+}

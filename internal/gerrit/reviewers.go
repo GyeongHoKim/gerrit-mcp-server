@@ -2,11 +2,11 @@ package gerrit
 
 import (
 	"context"
-	"errors"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
 )
-
-// errStubbed is returned by unimplemented endpoints.
-var errStubbed = errors.New("not implemented")
 
 // GroupBaseInfo identifies a Gerrit group.
 type GroupBaseInfo struct {
@@ -33,6 +33,33 @@ type SuggestedReviewerInfo struct {
 //
 // query is matched against names, emails and group names. A limit of zero
 // leaves the server's default in place.
-func (*Client) SuggestReviewers(_ context.Context, _, _ string, _ int) ([]SuggestedReviewerInfo, error) {
-	return nil, errStubbed
+func (c *Client) SuggestReviewers(
+	ctx context.Context,
+	changeID, query string,
+	limit int,
+) ([]SuggestedReviewerInfo, error) {
+	changeID = strings.TrimSpace(changeID)
+	if changeID == "" {
+		return nil, ErrEmptyChangeID
+	}
+
+	// An empty q is not the same as no q: Gerrit ranks differently for each,
+	// so a blank one is left off rather than sent through.
+	values := url.Values{}
+	if query = strings.TrimSpace(query); query != "" {
+		values.Set("q", query)
+	}
+
+	if limit > 0 {
+		values.Set("n", strconv.Itoa(limit))
+	}
+
+	var suggestions []SuggestedReviewerInfo
+
+	path := changePath(changeID, "/suggest_reviewers")
+	if err := c.do(ctx, http.MethodGet, path, values, nil, &suggestions); err != nil {
+		return nil, err
+	}
+
+	return suggestions, nil
 }
