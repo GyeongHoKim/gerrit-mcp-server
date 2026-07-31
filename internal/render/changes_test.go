@@ -166,6 +166,14 @@ func TestSubmittedTogether(t *testing.T) {
 		// An empty list means the change submits alone, which must not read as
 		// "nothing found".
 		"submitted_alone": {},
+		// Gerrit is documented to send the empty list rather than a list of
+		// one, so this guards the sentence rather than a state it produces.
+		"submitted_single": {
+			{
+				Number: 12345, Project: "p", Branch: "main", Subject: "first", Status: "NEW",
+				Owner: gerrit.AccountInfo{Username: "alice", AccountID: 1},
+			},
+		},
 		"submitted_with_others": {
 			{
 				Number: 12345, Project: "p", Branch: "main", Subject: "first", Status: "NEW",

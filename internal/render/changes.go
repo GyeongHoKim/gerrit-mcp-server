@@ -27,13 +27,7 @@ func Changes(changes []gerrit.ChangeInfo) string {
 
 	var out strings.Builder
 
-	out.WriteString(strconv.Itoa(len(changes)))
-
-	if len(changes) == 1 {
-		out.WriteString(" change")
-	} else {
-		out.WriteString(" changes")
-	}
+	writeCount(&out, len(changes))
 
 	// Gerrit flags a result set it cut short on the final entry. Reporting the
 	// count without saying so would state that a project has 25 open changes
@@ -52,6 +46,17 @@ func Changes(changes []gerrit.ChangeInfo) string {
 	}
 
 	return out.String()
+}
+
+// writeCount appends a change count with the noun agreeing with it.
+func writeCount(out *strings.Builder, count int) {
+	out.WriteString(strconv.Itoa(count))
+
+	if count == 1 {
+		out.WriteString(" change")
+	} else {
+		out.WriteString(" changes")
+	}
 }
 
 // truncated reports whether Gerrit cut the result set short.
@@ -119,8 +124,16 @@ func SubmittedTogether(changes []gerrit.ChangeInfo) string {
 
 	var out strings.Builder
 
-	out.WriteString(strconv.Itoa(len(changes)))
-	out.WriteString(" changes submit together, including this one.\n")
+	writeCount(&out, len(changes))
+
+	// A single entry should not reach here -- Gerrit answers with an empty
+	// list, not a list of one, when a change submits alone -- but the count is
+	// the server's to decide and the sentence still has to read.
+	if len(changes) == 1 {
+		out.WriteString(" submits together, including this one.\n")
+	} else {
+		out.WriteString(" submit together, including this one.\n")
+	}
 
 	for i := range changes {
 		out.WriteString("\n")
