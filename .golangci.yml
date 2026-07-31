@@ -153,6 +153,10 @@ linters:
     goconst:
       min-len: 3
       min-occurrences: 3
+      # Tool names are deliberately spelled out in the tests: the inventory
+      # test is a contract, and a constant shared with the registration would
+      # rename itself in lockstep and catch nothing.
+      ignore-tests: true
 
     gocritic:
       enabled-tags:
