@@ -1,7 +1,6 @@
 package render_test
 
 import (
-	"flag"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,32 +11,19 @@ import (
 	"github.com/GyeongHoKim/gerrit-mcp-server/internal/render"
 )
 
-// update rewrites the golden files instead of comparing against them.
-//
-//	go test ./internal/render -update
-var update = flag.Bool("update", false, "update golden files")
-
 // golden compares got against testdata/<name>.golden.
+//
+// There is deliberately no -update mode. A golden file captured from the
+// implementation records what the code happens to do; these are written by
+// hand so they record what it is supposed to do.
 func golden(t *testing.T, name, got string) {
 	t.Helper()
 
 	path := filepath.Join("testdata", name+".golden")
 
-	if *update {
-		if err := os.MkdirAll("testdata", 0o750); err != nil {
-			t.Fatalf("creating testdata: %v", err)
-		}
-
-		if err := os.WriteFile(path, []byte(got), 0o600); err != nil {
-			t.Fatalf("writing %s: %v", path, err)
-		}
-
-		return
-	}
-
 	raw, err := os.ReadFile(path) //nolint:gosec // the path is built from a test-supplied name
 	if err != nil {
-		t.Fatalf("reading %s (run with -update to create it): %v", path, err)
+		t.Fatalf("reading %s (write it by hand to add a case): %v", path, err)
 	}
 
 	// .gitattributes pins these files to LF, but a checkout predating it -- or
