@@ -2,6 +2,7 @@ package mcpserver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -193,3 +194,24 @@ func (s *server) listDraftComments(
 
 	return text(render.Drafts(byFile)), nil, nil
 }
+
+// registerChangesSubmittedTogether installs the changes_submitted_together tool.
+func registerChangesSubmittedTogether(s *server, srv *mcp.Server) {
+	mcp.AddTool(srv, &mcp.Tool{
+		Name:        "changes_submitted_together",
+		Description: "List the Gerrit changes that would be submitted together with a given change, including itself.",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, s.changesSubmittedTogether)
+}
+
+// changesSubmittedTogether lists the changes that submit alongside one.
+func (*server) changesSubmittedTogether(
+	_ context.Context,
+	_ *mcp.CallToolRequest,
+	_ changeIDInput,
+) (*mcp.CallToolResult, any, error) {
+	return nil, nil, errStubbed
+}
+
+// errStubbed is returned by unimplemented handlers.
+var errStubbed = errors.New("not implemented")

@@ -164,3 +164,31 @@ func TestChangesStaysCompact(t *testing.T) {
 			len(got), len(changes), maxBytesPerChange)
 	}
 }
+
+func TestSubmittedTogether(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string][]gerrit.ChangeInfo{
+		// An empty list means the change submits alone, which must not read as
+		// "nothing found".
+		"submitted_alone": {},
+		"submitted_with_others": {
+			{
+				Number: 12345, Project: "p", Branch: "main", Subject: "first", Status: "NEW",
+				Owner: gerrit.AccountInfo{Username: "alice", AccountID: 1},
+			},
+			{
+				Number: 12346, Project: "p", Branch: "main", Subject: "second", Status: "NEW",
+				Owner: gerrit.AccountInfo{Username: "bob", AccountID: 2},
+			},
+		},
+	}
+
+	for name, changes := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			golden(t, name, render.SubmittedTogether(changes))
+		})
+	}
+}

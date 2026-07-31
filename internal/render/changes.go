@@ -107,3 +107,11 @@ func writeChange(out *strings.Builder, change *gerrit.ChangeInfo) {
 
 	out.WriteString("\n")
 }
+
+// SubmittedTogether renders the changes that would submit alongside another.
+//
+// An empty list is not "no results": it means the change submits on its own,
+// which is what the caller actually wanted to know.
+func SubmittedTogether(_ []gerrit.ChangeInfo) string {
+	return ""
+}

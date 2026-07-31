@@ -438,3 +438,33 @@ func TestListDraftCommentsTool(t *testing.T) {
 		t.Errorf("output lost the draft body:\n%s", got)
 	}
 }
+
+func TestChangesSubmittedTogetherTool(t *testing.T) {
+	t.Parallel()
+
+	var gotPath string
+
+	srv := newServerAgainst(t, func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.EscapedPath()
+
+		if _, err := w.Write([]byte(")]}'\n[]")); err != nil {
+			t.Errorf("writing stub response: %v", err)
+		}
+	})
+
+	result := callTool(t, srv, "changes_submitted_together", map[string]any{"change_id": "12345"})
+
+	if result.IsError {
+		t.Fatalf("changes_submitted_together reported an error: %s", resultText(t, result))
+	}
+
+	if want := "/a/changes/12345/submitted_together"; gotPath != want {
+		t.Errorf("path = %q, want %q", gotPath, want)
+	}
+
+	// An empty list is an answer. Reporting it as "no results" would suggest
+	// the query failed rather than that the change stands alone.
+	if got := resultText(t, result); !strings.Contains(got, "by itself") {
+		t.Errorf("output = %q, want it to say the change submits alone", got)
+	}
+}

@@ -226,3 +226,15 @@ func (c *Client) GetCommitMessage(ctx context.Context, changeID string) (*Commit
 
 	return &message, nil
 }
+
+// errStubbed is returned by unimplemented endpoints.
+var errStubbed = errors.New("not implemented")
+
+// ChangesSubmittedTogether lists every change that would be submitted along
+// with this one.
+//
+// Gerrit returns an empty list when the change would submit by itself, which
+// is a meaningful answer rather than an absence of one.
+func (*Client) ChangesSubmittedTogether(_ context.Context, _ string) ([]ChangeInfo, error) {
+	return nil, errStubbed
+}

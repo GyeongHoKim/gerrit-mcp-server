@@ -393,3 +393,56 @@ func TestGetCommitMessageRejectsEmptyID(t *testing.T) {
 		t.Errorf("GetCommitMessage() error = %v, want ErrEmptyChangeID", err)
 	}
 }
+
+func TestChangesSubmittedTogether(t *testing.T) {
+	t.Parallel()
+
+	const body = `[
+	  {"_number": 12345, "project": "p", "branch": "main", "subject": "first", "status": "NEW"},
+	  {"_number": 12346, "project": "p", "branch": "main", "subject": "second", "status": "NEW"}
+	]`
+
+	var gotPath string
+
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.EscapedPath()
+
+		if _, err := w.Write([]byte(xssiPrefix + "\n" + body)); err != nil {
+			t.Errorf("writing test response: %v", err)
+		}
+	})
+
+	got, err := client.ChangesSubmittedTogether(t.Context(), "12345")
+	if err != nil {
+		t.Fatalf("ChangesSubmittedTogether() returned an unexpected error: %v", err)
+	}
+
+	if want := "/a/changes/12345/submitted_together"; gotPath != want {
+		t.Errorf("path = %q, want %q", gotPath, want)
+	}
+
+	if len(got) != 2 {
+		t.Errorf("len(changes) = %d, want 2", len(got))
+	}
+}
+
+func TestChangesSubmittedTogetherAloneIsEmptyNotAnError(t *testing.T) {
+	t.Parallel()
+
+	client := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		if _, err := w.Write([]byte(xssiPrefix + "\n[]")); err != nil {
+			t.Errorf("writing test response: %v", err)
+		}
+	})
+
+	// Gerrit returns an empty list when the change submits by itself. That is
+	// an answer, not a failure.
+	got, err := client.ChangesSubmittedTogether(t.Context(), "12345")
+	if err != nil {
+		t.Fatalf("ChangesSubmittedTogether() returned an unexpected error: %v", err)
+	}
+
+	if len(got) != 0 {
+		t.Errorf("len(changes) = %d, want 0", len(got))
+	}
+}
