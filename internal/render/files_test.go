@@ -88,6 +88,38 @@ func TestDiff(t *testing.T) {
 	}
 }
 
+func TestDiffNumbersLines(t *testing.T) {
+	t.Parallel()
+
+	// Without line numbers the model can quote a diff but cannot say where the
+	// problem is, and post_review_comment needs a line to attach to.
+	got := render.Diff("src/widget.go", &gerrit.DiffInfo{
+		ChangeType: "MODIFIED",
+		MetaA:      &gerrit.DiffFileMeta{Name: "src/widget.go", Lines: 120},
+		MetaB:      &gerrit.DiffFileMeta{Name: "src/widget.go", Lines: 159},
+		Content: []gerrit.DiffContent{
+			{AB: []string{"package widget", ""}},
+			{A: []string{"func old() {}"}, B: []string{"func new() {}", "func extra() {}"}},
+			// A skipped region advances both sides, or every number after it
+			// is wrong.
+			{Skip: 40},
+			{B: []string{"// trailing addition"}},
+		},
+	})
+
+	for _, want := range []string{
+		"   1   package widget",
+		"   3 - func old() {}",
+		"   3 + func new() {}",
+		"   4 + func extra() {}",
+		"  45 + // trailing addition",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("output is missing %q:\n%s", want, got)
+		}
+	}
+}
+
 func TestDiffTruncatesEnormousDiffs(t *testing.T) {
 	t.Parallel()
 
@@ -107,7 +139,7 @@ func TestDiffTruncatesEnormousDiffs(t *testing.T) {
 	// Asserting a bound looser than the cap would let a regression that
 	// raised the cap, or an off-by-one past it, go unnoticed. The output is
 	// the capped body plus the header, the blank line and the notice.
-	const overhead = 3
+	const overhead = 5
 
 	if lines := strings.Count(got, "\n"); lines > render.MaxDiffLines+overhead {
 		t.Errorf("rendered %d lines, want at most %d", lines, render.MaxDiffLines+overhead)

@@ -1,9 +1,11 @@
 src/widget.go (MODIFIED)
 
-  package widget
-  
-- func old() {}
-+ func new() {}
-+ func extra() {}
+Line numbers: '-' rows are the old file, others the new.
+
+   1   package widget
+   2   
+   3 - func old() {}
+   3 + func new() {}
+   4 + func extra() {}
 @@ 40 lines skipped @@
-+ // trailing addition
+  45 + // trailing addition
