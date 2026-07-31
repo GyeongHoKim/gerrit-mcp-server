@@ -393,3 +393,37 @@ func TestReadyAndWorkInProgressTools(t *testing.T) {
 		})
 	}
 }
+
+func TestRevertChangeToolNamesTheNewChange(t *testing.T) {
+	t.Parallel()
+
+	srv := newWritableServerAgainst(t, func(w http.ResponseWriter, _ *http.Request) {
+		const reverted = `{"_number": 99, "project": "p", "branch": "main",
+		  "subject": "Revert \"first\"", "status": "NEW"}`
+
+		if _, err := w.Write([]byte(")]}'\n" + reverted)); err != nil {
+			t.Errorf("writing stub response: %v", err)
+		}
+	})
+
+	result := callTool(t, srv, "revert_change", map[string]any{
+		"change_id": "12345",
+		"message":   "broke the build",
+	})
+
+	if result.IsError {
+		t.Fatalf("revert_change reported an error: %s", resultText(t, result))
+	}
+
+	// The revert is a new change that still needs review. Reporting only
+	// success would leave an agent believing the revert had landed.
+	got := resultText(t, result)
+
+	if !strings.Contains(got, "99") {
+		t.Errorf("output = %q, want it to name the change created", got)
+	}
+
+	if !strings.Contains(strings.ToLower(got), "review") {
+		t.Errorf("output = %q, want it to say the revert still needs review", got)
+	}
+}

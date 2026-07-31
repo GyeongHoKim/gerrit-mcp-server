@@ -46,6 +46,8 @@ var writeTools = []toolRegistrar{
 	registerSetTopic,
 	registerSetReadyForReview,
 	registerSetWorkInProgress,
+	registerAbandonChange,
+	registerRevertChange,
 }
 
 // server carries what the tool handlers need.

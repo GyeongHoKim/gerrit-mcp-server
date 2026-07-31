@@ -2,6 +2,7 @@ package mcpserver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -283,3 +284,48 @@ func (s *server) setWorkInProgress(
 
 	return text(render.WorkInProgressSet(in.ChangeID)), nil, nil
 }
+
+// registerAbandonChange installs the abandon_change tool.
+func registerAbandonChange(s *server, srv *mcp.Server) {
+	destructive := true
+
+	mcp.AddTool(srv, &mcp.Tool{
+		Name: "abandon_change",
+		Description: "Abandon a Gerrit change, stopping work on it without merging. " +
+			"This server cannot restore an abandoned change.",
+		Annotations: &mcp.ToolAnnotations{DestructiveHint: &destructive},
+	}, s.abandonChange)
+}
+
+// abandonChange abandons a change.
+func (*server) abandonChange(
+	_ context.Context,
+	_ *mcp.CallToolRequest,
+	_ changeMessageInput,
+) (*mcp.CallToolResult, any, error) {
+	return nil, nil, errStubbed
+}
+
+// registerRevertChange installs the revert_change tool.
+func registerRevertChange(s *server, srv *mcp.Server) {
+	destructive := true
+
+	mcp.AddTool(srv, &mcp.Tool{
+		Name: "revert_change",
+		Description: "Create a new Gerrit change that reverts a merged one. " +
+			"The revert still has to be reviewed and submitted.",
+		Annotations: &mcp.ToolAnnotations{DestructiveHint: &destructive},
+	}, s.revertChange)
+}
+
+// revertChange creates a change that undoes another.
+func (*server) revertChange(
+	_ context.Context,
+	_ *mcp.CallToolRequest,
+	_ changeMessageInput,
+) (*mcp.CallToolResult, any, error) {
+	return nil, nil, errStubbed
+}
+
+// errStubbed is returned by unimplemented handlers.
+var errStubbed = errors.New("not implemented")

@@ -163,3 +163,92 @@ func TestSetReadyForReviewRejectsEmptyID(t *testing.T) {
 		t.Errorf("SetReadyForReview() error = %v, want ErrEmptyChangeID", err)
 	}
 }
+
+func TestAbandonAndRevert(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		call     func(*Client, string) (*ChangeInfo, error)
+		wantPath string
+		wantBody string
+	}{
+		"abandon": {
+			call: func(c *Client, id string) (*ChangeInfo, error) {
+				return c.AbandonChange(t.Context(), id, "superseded")
+			},
+			wantPath: "/a/changes/12345/abandon",
+			wantBody: "superseded",
+		},
+		"revert": {
+			call: func(c *Client, id string) (*ChangeInfo, error) {
+				return c.RevertChange(t.Context(), id, "broke the build")
+			},
+			wantPath: "/a/changes/12345/revert",
+			wantBody: "broke the build",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			var (
+				gotPath string
+				gotBody map[string]any
+			)
+
+			client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				gotPath = r.URL.EscapedPath()
+
+				body, readErr := io.ReadAll(r.Body)
+				if readErr != nil {
+					t.Errorf("reading request body: %v", readErr)
+				}
+
+				if len(body) > 0 {
+					if decodeErr := json.Unmarshal(body, &gotBody); decodeErr != nil {
+						t.Errorf("decoding request body %q: %v", body, decodeErr)
+					}
+				}
+
+				const change = `{"_number": 99, "project": "p", "branch": "main",
+				  "subject": "Revert \"first\"", "status": "NEW"}`
+
+				if _, writeErr := w.Write([]byte(xssiPrefix + "\n" + change)); writeErr != nil {
+					t.Errorf("writing test response: %v", writeErr)
+				}
+			})
+
+			got, err := test.call(client, "12345")
+			if err != nil {
+				t.Fatalf("call returned an unexpected error: %v", err)
+			}
+
+			if gotPath != test.wantPath {
+				t.Errorf("path = %q, want %q", gotPath, test.wantPath)
+			}
+
+			if gotBody["message"] != test.wantBody {
+				t.Errorf("message = %v, want %q", gotBody["message"], test.wantBody)
+			}
+
+			// Both answer with a ChangeInfo. For a revert that is a different
+			// change from the one asked about, which is the whole point.
+			if got.Number != 99 {
+				t.Errorf("Number = %d, want 99 from the response", got.Number)
+			}
+		})
+	}
+}
+
+func TestAbandonChangeRejectsEmptyID(t *testing.T) {
+	t.Parallel()
+
+	client := newTestClient(t, func(_ http.ResponseWriter, _ *http.Request) {
+		t.Error("AbandonChange() reached the server, want it to refuse before that")
+	})
+
+	if _, err := client.AbandonChange(t.Context(), "", ""); !errors.Is(err, ErrEmptyChangeID) {
+		t.Errorf("AbandonChange() error = %v, want ErrEmptyChangeID", err)
+	}
+}
