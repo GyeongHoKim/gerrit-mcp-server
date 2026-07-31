@@ -71,6 +71,32 @@ func writeSuggestion(out *strings.Builder, suggestion *gerrit.SuggestedReviewerI
 }
 
 // ReviewerAdded confirms who was added to a change.
-func ReviewerAdded(_ string, _ *gerrit.ReviewerResult) string {
-	return ""
+func ReviewerAdded(changeID string, result *gerrit.ReviewerResult) string {
+	var out strings.Builder
+
+	for _, group := range []struct {
+		label    string
+		accounts []gerrit.AccountInfo
+	}{
+		{label: "reviewer", accounts: result.Reviewers},
+		{label: "CC", accounts: result.CCs},
+	} {
+		for i := range group.accounts {
+			out.WriteString("Added ")
+			out.WriteString(group.accounts[i].Display())
+			out.WriteString(" as ")
+			out.WriteString(group.label)
+			out.WriteString(" on change ")
+			out.WriteString(changeID)
+			out.WriteString(".\n")
+		}
+	}
+
+	if out.Len() == 0 {
+		// Gerrit accepted the request but named nobody, which happens when
+		// the account was already on the change.
+		return "Nobody was added to change " + changeID + "; they may already be on it.\n"
+	}
+
+	return out.String()
 }

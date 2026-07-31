@@ -2,7 +2,6 @@ package mcpserver
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -180,13 +179,19 @@ func registerAddReviewer(s *server, srv *mcp.Server) {
 }
 
 // addReviewer adds one reviewer or CC.
-func (*server) addReviewer(
-	_ context.Context,
+func (s *server) addReviewer(
+	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ addReviewerInput,
+	in addReviewerInput,
 ) (*mcp.CallToolResult, any, error) {
-	return nil, nil, errStubbed
-}
+	result, err := s.gerrit.AddReviewer(ctx, in.ChangeID, &gerrit.ReviewerInput{
+		Reviewer:  in.Reviewer,
+		State:     in.State,
+		Confirmed: in.Confirm,
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("adding %s to %s: %w", in.Reviewer, in.ChangeID, err)
+	}
 
-// errStubbed is returned by unimplemented handlers.
-var errStubbed = errors.New("not implemented")
+	return text(render.ReviewerAdded(in.ChangeID, result)), nil, nil
+}

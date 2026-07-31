@@ -3,6 +3,7 @@ package gerrit
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -65,9 +66,6 @@ func (c *Client) SuggestReviewers(
 	return suggestions, nil
 }
 
-// errStubbed is returned by unimplemented endpoints.
-var errStubbed = errors.New("not implemented")
-
 // Reviewer states for [ReviewerInput.State].
 const (
 	// StateReviewer adds someone who is expected to vote.
@@ -111,6 +109,34 @@ var ErrConfirmationRequired = errors.New("adding this group needs confirmation")
 var ErrEmptyReviewer = errors.New("reviewer must not be empty")
 
 // AddReviewer adds one reviewer or CC to a change.
-func (*Client) AddReviewer(_ context.Context, _ string, _ *ReviewerInput) (*ReviewerResult, error) {
-	return nil, errStubbed
+func (c *Client) AddReviewer(
+	ctx context.Context,
+	changeID string,
+	in *ReviewerInput,
+) (*ReviewerResult, error) {
+	changeID = strings.TrimSpace(changeID)
+	if changeID == "" {
+		return nil, ErrEmptyChangeID
+	}
+
+	if strings.TrimSpace(in.Reviewer) == "" {
+		return nil, ErrEmptyReviewer
+	}
+
+	var result ReviewerResult
+	if err := c.do(ctx, http.MethodPost, changePath(changeID, "/reviewers"), nil, in, &result); err != nil {
+		return nil, err
+	}
+
+	// Gerrit reports both outcomes inside a 200, and they are not the same
+	// thing: a confirmation can be retried, a refusal cannot.
+	if result.Confirm {
+		return nil, fmt.Errorf("%w: %s", ErrConfirmationRequired, result.Error)
+	}
+
+	if result.Error != "" {
+		return nil, fmt.Errorf("%w: %s", ErrReviewerRejected, result.Error)
+	}
+
+	return &result, nil
 }
