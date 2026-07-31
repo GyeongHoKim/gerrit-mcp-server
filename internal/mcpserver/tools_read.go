@@ -2,7 +2,6 @@ package mcpserver
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -136,13 +135,15 @@ func registerGetFileDiff(s *server, srv *mcp.Server) {
 }
 
 // getFileDiff retrieves and renders one file's diff.
-func (*server) getFileDiff(
-	_ context.Context,
+func (s *server) getFileDiff(
+	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ fileDiffInput,
+	in fileDiffInput,
 ) (*mcp.CallToolResult, any, error) {
-	return nil, nil, errStubbed
-}
+	diff, err := s.gerrit.GetFileDiff(ctx, in.ChangeID, in.File)
+	if err != nil {
+		return nil, nil, fmt.Errorf("fetching diff of %s in %s: %w", in.File, in.ChangeID, err)
+	}
 
-// errStubbed is returned by unimplemented handlers.
-var errStubbed = errors.New("not implemented")
+	return text(render.Diff(in.File, diff)), nil, nil
+}

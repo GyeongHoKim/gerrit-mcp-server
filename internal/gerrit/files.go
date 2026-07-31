@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -55,9 +56,6 @@ func (c *Client) ListFiles(ctx context.Context, changeID string) (map[string]Fil
 	return files, nil
 }
 
-// errStubbed is returned by unimplemented endpoints.
-var errStubbed = errors.New("not implemented")
-
 // DiffFileMeta describes one side of a diff.
 type DiffFileMeta struct {
 	// Name is the file path on this side.
@@ -102,6 +100,25 @@ type DiffInfo struct {
 }
 
 // GetFileDiff retrieves the diff of one file in a change's current patch set.
-func (*Client) GetFileDiff(_ context.Context, _, _ string) (*DiffInfo, error) {
-	return nil, errStubbed
+func (c *Client) GetFileDiff(ctx context.Context, changeID, file string) (*DiffInfo, error) {
+	changeID = strings.TrimSpace(changeID)
+	if changeID == "" {
+		return nil, ErrEmptyChangeID
+	}
+
+	file = strings.TrimSpace(file)
+	if file == "" {
+		return nil, ErrEmptyFilePath
+	}
+
+	// The file path is one path segment, so its slashes must be escaped or
+	// Gerrit resolves a different endpoint entirely.
+	path := revisionPath(changeID, "/files/"+url.PathEscape(file)+"/diff")
+
+	var diff DiffInfo
+	if err := c.do(ctx, http.MethodGet, path, nil, nil, &diff); err != nil {
+		return nil, err
+	}
+
+	return &diff, nil
 }
