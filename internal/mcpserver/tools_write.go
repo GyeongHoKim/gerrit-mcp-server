@@ -2,7 +2,6 @@ package mcpserver
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -118,13 +117,14 @@ func registerDeleteDraftComment(s *server, srv *mcp.Server) {
 }
 
 // deleteDraftComment discards one staged comment.
-func (*server) deleteDraftComment(
-	_ context.Context,
+func (s *server) deleteDraftComment(
+	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ deleteDraftCommentInput,
+	in deleteDraftCommentInput,
 ) (*mcp.CallToolResult, any, error) {
-	return nil, nil, errStubbed
-}
+	if err := s.gerrit.DeleteDraftComment(ctx, in.ChangeID, in.DraftID); err != nil {
+		return nil, nil, fmt.Errorf("discarding draft %s on %s: %w", in.DraftID, in.ChangeID, err)
+	}
 
-// errStubbed is returned by unimplemented handlers.
-var errStubbed = errors.New("not implemented")
+	return text(render.DraftDeleted(in.ChangeID, in.DraftID)), nil, nil
+}

@@ -200,6 +200,6 @@ func DraftsPublished(changeID string, allRevisions bool) string {
 }
 
 // DraftDeleted confirms one staged comment was discarded.
-func DraftDeleted(_, _ string) string {
-	return ""
+func DraftDeleted(changeID, draftID string) string {
+	return "Draft comment " + draftID + " on change " + changeID + " is discarded.\n"
 }
