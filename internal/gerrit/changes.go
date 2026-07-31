@@ -171,11 +171,9 @@ type ChangeDetail struct {
 	Reviewers map[string][]AccountInfo `json:"reviewers,omitempty"`
 	// ChangeID is the Change-Id footer from the commit message.
 	ChangeID string `json:"change_id"`
-	// CurrentRevision is the commit of the current patch set.
-	CurrentRevision string `json:"current_revision,omitempty"`
-
-	// Embedded last so that the struct packs without padding; the field order
-	// here has no bearing on the JSON, which is keyed by name.
+	// Embedded after the pointer-bearing fields so the struct's scannable
+	// prefix stays short. Field order has no bearing on the JSON, which is
+	// keyed by name.
 	ChangeInfo
 
 	// TotalCommentCount counts every comment on the change.
@@ -189,9 +187,16 @@ var ErrEmptyChangeID = errors.New("change id must not be empty")
 
 // GetChange retrieves one change with its labels, reviewers and comment
 // counts.
-func (*Client) GetChange(_ context.Context, _ string) (*ChangeDetail, error) {
-	return nil, errStubbed
-}
+func (c *Client) GetChange(ctx context.Context, changeID string) (*ChangeDetail, error) {
+	changeID = strings.TrimSpace(changeID)
+	if changeID == "" {
+		return nil, ErrEmptyChangeID
+	}
 
-// errStubbed is returned by unimplemented endpoints.
-var errStubbed = errors.New("not implemented")
+	var detail ChangeDetail
+	if err := c.do(ctx, http.MethodGet, changePath(changeID, "/detail"), nil, nil, &detail); err != nil {
+		return nil, err
+	}
+
+	return &detail, nil
+}

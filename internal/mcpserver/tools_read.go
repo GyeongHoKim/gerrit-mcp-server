@@ -2,7 +2,6 @@ package mcpserver
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -59,13 +58,15 @@ func registerGetChangeDetails(s *server, srv *mcp.Server) {
 }
 
 // getChangeDetails retrieves one change and renders its review state.
-func (*server) getChangeDetails(
-	_ context.Context,
+func (s *server) getChangeDetails(
+	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ changeIDInput,
+	in changeIDInput,
 ) (*mcp.CallToolResult, any, error) {
-	return nil, nil, errStubbed
-}
+	detail, err := s.gerrit.GetChange(ctx, in.ChangeID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("fetching change %s: %w", in.ChangeID, err)
+	}
 
-// errStubbed is returned by unimplemented handlers.
-var errStubbed = errors.New("not implemented")
+	return text(render.ChangeDetail(detail)), nil, nil
+}
