@@ -13,10 +13,16 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"log/slog"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/GyeongHoKim/gerrit-mcp-server/internal/config"
+	"github.com/GyeongHoKim/gerrit-mcp-server/internal/gerrit"
+	"github.com/GyeongHoKim/gerrit-mcp-server/internal/mcpserver"
 	"github.com/GyeongHoKim/gerrit-mcp-server/internal/version"
 )
 
@@ -53,16 +59,35 @@ func run(ctx context.Context, args []string, stdout io.Writer) error {
 	return serve(ctx)
 }
 
-// serve runs the MCP server over stdio until the client disconnects.
+// serve builds the server from the environment and runs it over stdio until
+// the client disconnects.
 func serve(ctx context.Context) error {
-	server := mcp.NewServer(&mcp.Implementation{
-		Name:    "gerrit",
-		Version: version.Version,
-	}, nil)
+	cfg, err := config.Load(os.LookupEnv)
+	if err != nil {
+		return fmt.Errorf("reading configuration: %w", err)
+	}
 
-	// Tools are registered here once internal/mcpserver lands.
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: cfg.LogLevel}))
 
-	if err := server.Run(ctx, &mcp.StdioTransport{}); err != nil {
+	// Deliberately not the token. Everything here is safe in a shared log.
+	logger.Info("serving gerrit over stdio",
+		"url", cfg.BaseURL.String(),
+		"user", cfg.User,
+		"writes_allowed", cfg.AllowWrite,
+		"version", version.Version,
+	)
+
+	if !cfg.AllowWrite {
+		logger.Info("write tools are not registered; set " + config.EnvAllowWrite + "=true to enable them")
+	}
+
+	// Ctrl-C and SIGTERM unwind the same path a disconnecting client does.
+	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	server := mcpserver.New(gerrit.New(cfg), cfg.AllowWrite)
+
+	if err = server.Run(ctx, &mcp.StdioTransport{}); err != nil {
 		return fmt.Errorf("serving over stdio: %w", err)
 	}
 
