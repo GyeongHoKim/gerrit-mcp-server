@@ -2,6 +2,7 @@ package mcpserver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -93,3 +94,24 @@ func (s *server) getCommitMessage(
 
 	return text(render.CommitMessage(message)), nil, nil
 }
+
+// registerListChangeFiles installs the list_change_files tool.
+func registerListChangeFiles(s *server, srv *mcp.Server) {
+	mcp.AddTool(srv, &mcp.Tool{
+		Name:        "list_change_files",
+		Description: "List the files modified by a Gerrit change's current patch set, with per-file line counts.",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, s.listChangeFiles)
+}
+
+// listChangeFiles lists the files a change touches.
+func (*server) listChangeFiles(
+	_ context.Context,
+	_ *mcp.CallToolRequest,
+	_ changeIDInput,
+) (*mcp.CallToolResult, any, error) {
+	return nil, nil, errStubbed
+}
+
+// errStubbed is returned by unimplemented handlers.
+var errStubbed = errors.New("not implemented")

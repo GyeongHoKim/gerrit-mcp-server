@@ -269,3 +269,44 @@ func TestGetCommitMessageTool(t *testing.T) {
 		t.Errorf("output leaks raw Gerrit JSON:\n%s", got)
 	}
 }
+
+func TestListChangeFilesTool(t *testing.T) {
+	t.Parallel()
+
+	const body = `{
+	  "/COMMIT_MSG": {"status": "A", "lines_inserted": 9, "size_delta": 320, "size": 320},
+	  "src/widget.go": {"lines_inserted": 42, "lines_deleted": 3, "size_delta": 900, "size": 4200}
+	}`
+
+	var gotPath string
+
+	srv := newServerAgainst(t, func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.EscapedPath()
+
+		if _, err := w.Write([]byte(")]}'\n" + body)); err != nil {
+			t.Errorf("writing stub response: %v", err)
+		}
+	})
+
+	result := callTool(t, srv, "list_change_files", map[string]any{"change_id": "12345"})
+
+	if result.IsError {
+		t.Fatalf("list_change_files reported an error: %s", resultText(t, result))
+	}
+
+	if want := "/a/changes/12345/revisions/current/files/"; gotPath != want {
+		t.Errorf("path = %q, want %q", gotPath, want)
+	}
+
+	got := resultText(t, result)
+
+	for _, want := range []string{"src/widget.go", "+42/-3", "/COMMIT_MSG"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("output does not mention %q:\n%s", want, got)
+		}
+	}
+
+	if strings.Contains(got, "size_delta") {
+		t.Errorf("output leaks raw Gerrit JSON:\n%s", got)
+	}
+}
