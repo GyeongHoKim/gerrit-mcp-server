@@ -162,6 +162,28 @@ func commentLocation(comment *gerrit.CommentInfo) string {
 }
 
 // DraftCreated confirms a staged comment.
-func DraftCreated(_ *gerrit.CommentInfo) string {
-	return ""
+func DraftCreated(draft *gerrit.CommentInfo) string {
+	var out strings.Builder
+
+	// Saying "draft" plainly matters: nothing here is visible to reviewers
+	// until publish_drafts runs.
+	out.WriteString("Draft comment staged, not yet published.\n\n  [")
+	out.WriteString(draft.ID)
+	out.WriteString("] ")
+	out.WriteString(commentLocation(draft))
+
+	if draft.PatchSet > 0 {
+		out.WriteString(" · ps")
+		out.WriteString(strconv.Itoa(draft.PatchSet))
+	}
+
+	if draft.Unresolved {
+		out.WriteString(" · UNRESOLVED")
+	}
+
+	out.WriteString("\n    ")
+	out.WriteString(strings.ReplaceAll(draft.Message, "\n", "\n    "))
+	out.WriteString("\n")
+
+	return out.String()
 }

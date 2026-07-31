@@ -2,13 +2,13 @@ package mcpserver
 
 import (
 	"context"
-	"errors"
+	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-)
 
-// errStubbed is returned by unimplemented handlers.
-var errStubbed = errors.New("not implemented")
+	"github.com/GyeongHoKim/gerrit-mcp-server/internal/gerrit"
+	"github.com/GyeongHoKim/gerrit-mcp-server/internal/render"
+)
 
 // postReviewCommentInput is the argument schema for the post_review_comment
 // tool.
@@ -42,10 +42,22 @@ func registerPostReviewComment(s *server, srv *mcp.Server) {
 // postReviewComment stages a draft comment.
 //
 //nolint:gocritic // hugeParam: the SDK hands tool input to the handler by value
-func (*server) postReviewComment(
-	_ context.Context,
+func (s *server) postReviewComment(
+	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ postReviewCommentInput,
+	in postReviewCommentInput,
 ) (*mcp.CallToolResult, any, error) {
-	return nil, nil, errStubbed
+	draft, err := s.gerrit.CreateDraftComment(ctx, in.ChangeID, &gerrit.CommentInput{
+		Path:       in.File,
+		Side:       in.Side,
+		Message:    in.Message,
+		InReplyTo:  in.InReplyTo,
+		Line:       in.Line,
+		Unresolved: in.Unresolved,
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("staging a draft comment on %s: %w", in.ChangeID, err)
+	}
+
+	return text(render.DraftCreated(draft)), nil, nil
 }

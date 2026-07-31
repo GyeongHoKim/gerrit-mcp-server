@@ -72,9 +72,6 @@ func (c *Client) comments(ctx context.Context, changeID, suffix string) (map[str
 	return byFile, nil
 }
 
-// errStubbed is returned by unimplemented endpoints.
-var errStubbed = errors.New("not implemented")
-
 // ErrEmptyMessage reports a comment with nothing to say.
 var ErrEmptyMessage = errors.New("comment message must not be empty")
 
@@ -102,6 +99,28 @@ type CommentInput struct {
 //
 // Drafts are deliberate: nothing reaches the change's reviewers until
 // publish_drafts is called.
-func (*Client) CreateDraftComment(_ context.Context, _ string, _ *CommentInput) (*CommentInfo, error) {
-	return nil, errStubbed
+func (c *Client) CreateDraftComment(
+	ctx context.Context,
+	changeID string,
+	in *CommentInput,
+) (*CommentInfo, error) {
+	changeID = strings.TrimSpace(changeID)
+	if changeID == "" {
+		return nil, ErrEmptyChangeID
+	}
+
+	if strings.TrimSpace(in.Message) == "" {
+		return nil, ErrEmptyMessage
+	}
+
+	if strings.TrimSpace(in.Path) == "" {
+		return nil, ErrEmptyFilePath
+	}
+
+	var draft CommentInfo
+	if err := c.do(ctx, http.MethodPut, revisionPath(changeID, "/drafts"), nil, in, &draft); err != nil {
+		return nil, err
+	}
+
+	return &draft, nil
 }
