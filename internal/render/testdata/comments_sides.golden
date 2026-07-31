@@ -1,0 +1,7 @@
+2 comments on 1 file, 0 unresolved.
+
+src/widget.go
+  [s1] line 42 (old side) · Bob Brown · ps2
+    this line is going away
+  [s2] line 42 · Bob Brown · ps2
+    and this replaces it

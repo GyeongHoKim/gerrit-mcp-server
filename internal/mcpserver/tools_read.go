@@ -2,6 +2,7 @@ package mcpserver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -147,3 +148,24 @@ func (s *server) getFileDiff(
 
 	return text(render.Diff(in.File, diff)), nil, nil
 }
+
+// registerListChangeComments installs the list_change_comments tool.
+func registerListChangeComments(s *server, srv *mcp.Server) {
+	mcp.AddTool(srv, &mcp.Tool{
+		Name:        "list_change_comments",
+		Description: "List the published review comments on a Gerrit change, grouped by file, with their resolved state.",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, s.listChangeComments)
+}
+
+// listChangeComments lists the published comments on a change.
+func (*server) listChangeComments(
+	_ context.Context,
+	_ *mcp.CallToolRequest,
+	_ changeIDInput,
+) (*mcp.CallToolResult, any, error) {
+	return nil, nil, errStubbed
+}
+
+// errStubbed is returned by unimplemented handlers.
+var errStubbed = errors.New("not implemented")

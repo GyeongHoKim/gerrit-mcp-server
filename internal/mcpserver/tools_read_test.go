@@ -355,3 +355,43 @@ func TestGetFileDiffTool(t *testing.T) {
 		}
 	}
 }
+
+func TestListChangeCommentsTool(t *testing.T) {
+	t.Parallel()
+
+	const body = `{
+	  "src/widget.go": [
+	    {"id": "c2", "line": 42, "message": "extract this", "patch_set": 2, "unresolved": true,
+	     "updated": "2026-07-30 09:00:00.000000000",
+	     "author": {"_account_id": 3, "name": "Carol Chen"}}
+	  ]
+	}`
+
+	var gotPath string
+
+	srv := newServerAgainst(t, func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.EscapedPath()
+
+		if _, err := w.Write([]byte(")]}'\n" + body)); err != nil {
+			t.Errorf("writing stub response: %v", err)
+		}
+	})
+
+	result := callTool(t, srv, "list_change_comments", map[string]any{"change_id": "12345"})
+
+	if result.IsError {
+		t.Fatalf("list_change_comments reported an error: %s", resultText(t, result))
+	}
+
+	if want := "/a/changes/12345/comments"; gotPath != want {
+		t.Errorf("path = %q, want %q", gotPath, want)
+	}
+
+	got := resultText(t, result)
+
+	for _, want := range []string{"src/widget.go", "extract this", "Carol Chen", "UNRESOLVED"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("output does not mention %q:\n%s", want, got)
+		}
+	}
+}

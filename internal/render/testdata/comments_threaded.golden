@@ -1,0 +1,13 @@
+4 comments on 2 files, 2 unresolved.
+
+/COMMIT_MSG
+  [c1] line 7 · Bob Brown · ps2 · UNRESOLVED
+    typo in the subject
+
+src/widget.go
+  [c2] lines 42-44 · Carol Chen · ps2 · UNRESOLVED
+    extract this
+  [c3] line 42 · Alice Adams · ps2 · in reply to c2
+    done
+  [c4] file · Alice Adams · ps2
+    file-level note
