@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestSetTopic(t *testing.T) {
@@ -308,6 +310,65 @@ func TestCreateChange(t *testing.T) {
 
 	if got.Number != 500 {
 		t.Errorf("Number = %d, want 500", got.Number)
+	}
+}
+
+func TestCreateChangeLeavesTheCallersInputAlone(t *testing.T) {
+	t.Parallel()
+
+	client := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		if _, err := w.Write([]byte(xssiPrefix + "\n" + `{"_number": 500}`)); err != nil {
+			t.Errorf("writing test response: %v", err)
+		}
+	})
+
+	in := ChangeInput{Project: " p ", Branch: " main ", Subject: " add the thing "}
+
+	if _, err := client.CreateChange(t.Context(), &in); err != nil {
+		t.Fatalf("CreateChange() returned an unexpected error: %v", err)
+	}
+
+	// Trimming is what Gerrit is sent, not an edit of what the caller holds.
+	want := ChangeInput{Project: " p ", Branch: " main ", Subject: " add the thing "}
+	if diff := cmp.Diff(want, in); diff != "" {
+		t.Errorf("CreateChange() modified the caller's input (-want +got):\n%s", diff)
+	}
+}
+
+func TestCreateChangeTrimsWhatItSends(t *testing.T) {
+	t.Parallel()
+
+	var gotBody map[string]any
+
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		body, readErr := io.ReadAll(r.Body)
+		if readErr != nil {
+			t.Errorf("reading request body: %v", readErr)
+		}
+
+		if decodeErr := json.Unmarshal(body, &gotBody); decodeErr != nil {
+			t.Errorf("decoding request body %q: %v", body, decodeErr)
+		}
+
+		if _, writeErr := w.Write([]byte(xssiPrefix + "\n" + `{"_number": 500}`)); writeErr != nil {
+			t.Errorf("writing test response: %v", writeErr)
+		}
+	})
+
+	in := ChangeInput{Project: " p ", Branch: " main ", Subject: " add the thing "}
+
+	if _, err := client.CreateChange(t.Context(), &in); err != nil {
+		t.Fatalf("CreateChange() returned an unexpected error: %v", err)
+	}
+
+	for field, want := range map[string]string{
+		"project": "p",
+		"branch":  "main",
+		"subject": "add the thing",
+	} {
+		if gotBody[field] != want {
+			t.Errorf("%s = %v, want %q", field, gotBody[field], want)
+		}
 	}
 }
 
