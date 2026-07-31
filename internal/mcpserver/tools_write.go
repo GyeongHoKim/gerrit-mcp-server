@@ -2,8 +2,8 @@ package mcpserver
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -215,13 +215,16 @@ func registerSetTopic(s *server, srv *mcp.Server) {
 }
 
 // setTopic sets or clears a change's topic.
-func (*server) setTopic(
-	_ context.Context,
+func (s *server) setTopic(
+	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ setTopicInput,
+	in setTopicInput,
 ) (*mcp.CallToolResult, any, error) {
-	return nil, nil, errStubbed
-}
+	topic := strings.TrimSpace(in.Topic)
 
-// errStubbed is returned by unimplemented handlers.
-var errStubbed = errors.New("not implemented")
+	if err := s.gerrit.SetTopic(ctx, in.ChangeID, topic); err != nil {
+		return nil, nil, fmt.Errorf("setting the topic on %s: %w", in.ChangeID, err)
+	}
+
+	return text(render.TopicSet(in.ChangeID, topic)), nil, nil
+}
