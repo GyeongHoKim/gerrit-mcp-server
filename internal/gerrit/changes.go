@@ -213,9 +213,16 @@ type CommitMessageInfo struct {
 
 // GetCommitMessage retrieves the commit message of a change's current patch
 // set.
-func (*Client) GetCommitMessage(_ context.Context, _ string) (*CommitMessageInfo, error) {
-	return nil, errStubbed
-}
+func (c *Client) GetCommitMessage(ctx context.Context, changeID string) (*CommitMessageInfo, error) {
+	changeID = strings.TrimSpace(changeID)
+	if changeID == "" {
+		return nil, ErrEmptyChangeID
+	}
 
-// errStubbed is returned by unimplemented endpoints.
-var errStubbed = errors.New("not implemented")
+	var message CommitMessageInfo
+	if err := c.do(ctx, http.MethodGet, changePath(changeID, "/message"), nil, nil, &message); err != nil {
+		return nil, err
+	}
+
+	return &message, nil
+}

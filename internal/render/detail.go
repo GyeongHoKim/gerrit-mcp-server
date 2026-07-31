@@ -127,6 +127,15 @@ func writeReviewers(out *strings.Builder, reviewers map[string][]gerrit.AccountI
 // The message is already prose written for humans, so it is passed through
 // unchanged apart from guaranteeing the trailing newline that Gerrit does not
 // always send.
-func CommitMessage(_ *gerrit.CommitMessageInfo) string {
-	return ""
+func CommitMessage(message *gerrit.CommitMessageInfo) string {
+	body := message.FullMessage
+	if body == "" {
+		body = message.Subject
+	}
+
+	if !strings.HasSuffix(body, "\n") {
+		body += "\n"
+	}
+
+	return body
 }
