@@ -2,6 +2,7 @@ package mcpserver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -41,3 +42,30 @@ func (s *server) queryChanges(
 
 	return text(render.Changes(changes)), nil, nil
 }
+
+// changeIDInput is the argument schema for tools that act on one change.
+type changeIDInput struct {
+	// ChangeID identifies the change.
+	ChangeID string `json:"change_id" jsonschema:"the change number (12345) or the triplet project~branch~Change-Id"`
+}
+
+// registerGetChangeDetails installs the get_change_details tool.
+func registerGetChangeDetails(s *server, srv *mcp.Server) {
+	mcp.AddTool(srv, &mcp.Tool{
+		Name:        "get_change_details",
+		Description: "Retrieve one Gerrit change with its status, labels, reviewers and comment counts.",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, s.getChangeDetails)
+}
+
+// getChangeDetails retrieves one change and renders its review state.
+func (*server) getChangeDetails(
+	_ context.Context,
+	_ *mcp.CallToolRequest,
+	_ changeIDInput,
+) (*mcp.CallToolResult, any, error) {
+	return nil, nil, errStubbed
+}
+
+// errStubbed is returned by unimplemented handlers.
+var errStubbed = errors.New("not implemented")

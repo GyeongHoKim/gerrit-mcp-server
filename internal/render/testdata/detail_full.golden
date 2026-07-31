@@ -1,0 +1,12 @@
+[12345] NEW +42/-3 — fix the widget alignment
+  platform/base ~ main · Alice Adams · 2026-07-31 06:04 UTC
+
+Change-Id: I8473b95934b5732ac55d26311a706c9c2bde9940
+Comments: 5 total, 2 unresolved
+
+Labels:
+  Code-Review: +2 Bob Brown, -1 Carol Chen
+  Verified: +1 CI Bot
+
+Reviewers: Bob Brown, Carol Chen
+CC: Dave Davis

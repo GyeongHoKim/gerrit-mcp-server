@@ -25,6 +25,7 @@ type toolRegistrar func(*server, *mcp.Server)
 // readTools never modify Gerrit and are registered unconditionally.
 var readTools = []toolRegistrar{
 	registerQueryChanges,
+	registerGetChangeDetails,
 }
 
 // writeTools modify Gerrit and are registered only when writes are allowed.

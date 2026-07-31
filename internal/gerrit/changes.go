@@ -135,3 +135,63 @@ func (c *Client) QueryChanges(ctx context.Context, query string, limit int) ([]C
 
 	return changes, nil
 }
+
+// ApprovalInfo is one account's vote on a label.
+type ApprovalInfo struct {
+	AccountInfo
+
+	// Value is the vote, for example 2 for a Code-Review +2.
+	Value int `json:"value,omitempty"`
+}
+
+// LabelInfo is the vote state of one label on a change.
+type LabelInfo struct {
+	// Approved is a user who gave the label its maximum value.
+	Approved *AccountInfo `json:"approved,omitempty"`
+	// Rejected is a user who gave the label its minimum value.
+	Rejected *AccountInfo `json:"rejected,omitempty"`
+	// Recommended is a user who voted positively but not the maximum.
+	Recommended *AccountInfo `json:"recommended,omitempty"`
+	// Disliked is a user who voted negatively but not the minimum.
+	Disliked *AccountInfo `json:"disliked,omitempty"`
+	// All is every vote cast on this label.
+	All []ApprovalInfo `json:"all,omitempty"`
+	// Optional reports a label that does not block submission.
+	Optional bool `json:"optional,omitempty"`
+	// Blocking reports a label whose current state blocks submission.
+	Blocking bool `json:"blocking,omitempty"`
+}
+
+// ChangeDetail is a change with the review state Gerrit only returns from the
+// detail endpoint.
+type ChangeDetail struct {
+	// Labels is the vote state, keyed by label name.
+	Labels map[string]LabelInfo `json:"labels,omitempty"`
+	// Reviewers is keyed by state: REVIEWER, CC or REMOVED.
+	Reviewers map[string][]AccountInfo `json:"reviewers,omitempty"`
+	// ChangeID is the Change-Id footer from the commit message.
+	ChangeID string `json:"change_id"`
+	// CurrentRevision is the commit of the current patch set.
+	CurrentRevision string `json:"current_revision,omitempty"`
+
+	// Embedded last so that the struct packs without padding; the field order
+	// here has no bearing on the JSON, which is keyed by name.
+	ChangeInfo
+
+	// TotalCommentCount counts every comment on the change.
+	TotalCommentCount int `json:"total_comment_count"`
+	// UnresolvedCommentCount counts the comments still marked unresolved.
+	UnresolvedCommentCount int `json:"unresolved_comment_count"`
+}
+
+// ErrEmptyChangeID reports a call with no change to act on.
+var ErrEmptyChangeID = errors.New("change id must not be empty")
+
+// GetChange retrieves one change with its labels, reviewers and comment
+// counts.
+func (*Client) GetChange(_ context.Context, _ string) (*ChangeDetail, error) {
+	return nil, errStubbed
+}
+
+// errStubbed is returned by unimplemented endpoints.
+var errStubbed = errors.New("not implemented")

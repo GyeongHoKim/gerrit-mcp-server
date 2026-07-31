@@ -166,3 +166,66 @@ func TestQueryChangesToolReportsGerritFailures(t *testing.T) {
 		t.Errorf("error text = %q, want it to explain the refusal", got)
 	}
 }
+
+func TestGetChangeDetailsTool(t *testing.T) {
+	t.Parallel()
+
+	const body = `{
+	  "project": "platform/base", "branch": "main",
+	  "change_id": "I8473b959", "subject": "fix the widget alignment",
+	  "status": "NEW", "_number": 12345,
+	  "total_comment_count": 5, "unresolved_comment_count": 2,
+	  "owner": {"_account_id": 1, "name": "Alice Adams"},
+	  "labels": {"Code-Review": {"all": [{"_account_id": 2, "name": "Bob Brown", "value": 2}]}}
+	}`
+
+	var gotPath string
+
+	srv := newServerAgainst(t, func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.EscapedPath()
+
+		if _, err := w.Write([]byte(")]}'\n" + body)); err != nil {
+			t.Errorf("writing stub response: %v", err)
+		}
+	})
+
+	result := callTool(t, srv, "get_change_details", map[string]any{"change_id": "12345"})
+
+	if result.IsError {
+		t.Fatalf("get_change_details reported an error: %s", resultText(t, result))
+	}
+
+	if want := "/a/changes/12345/detail"; gotPath != want {
+		t.Errorf("path = %q, want %q", gotPath, want)
+	}
+
+	got := resultText(t, result)
+
+	for _, want := range []string{"12345", "fix the widget alignment", "Code-Review: +2 Bob Brown", "2 unresolved"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("output does not mention %q:\n%s", want, got)
+		}
+	}
+}
+
+func TestGetChangeDetailsToolIsReadOnly(t *testing.T) {
+	t.Parallel()
+
+	srv := newServerAgainst(t, func(_ http.ResponseWriter, _ *http.Request) {})
+
+	result, err := connect(t, srv).ListTools(t.Context(), nil)
+	if err != nil {
+		t.Fatalf("listing tools: %v", err)
+	}
+
+	index := slices.IndexFunc(result.Tools, func(tool *mcp.Tool) bool {
+		return tool.Name == "get_change_details"
+	})
+	if index < 0 {
+		t.Fatal("get_change_details is not registered on a read-only server")
+	}
+
+	if annotations := result.Tools[index].Annotations; annotations == nil || !annotations.ReadOnlyHint {
+		t.Error("get_change_details is missing the read-only annotation")
+	}
+}
