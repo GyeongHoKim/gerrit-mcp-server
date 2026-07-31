@@ -276,3 +276,44 @@ func TestDeleteDraftCommentsTool(t *testing.T) {
 		t.Errorf("output = %q, want it to say how many drafts were discarded", got)
 	}
 }
+
+func TestAddReviewerTool(t *testing.T) {
+	t.Parallel()
+
+	var gotBody map[string]any
+
+	srv := newWritableServerAgainst(t, func(w http.ResponseWriter, r *http.Request) {
+		body, readErr := io.ReadAll(r.Body)
+		if readErr != nil {
+			t.Errorf("reading request body: %v", readErr)
+		}
+
+		if decodeErr := json.Unmarshal(body, &gotBody); decodeErr != nil {
+			t.Errorf("decoding request body %q: %v", body, decodeErr)
+		}
+
+		const added = `{"ccs": [{"_account_id": 3, "name": "Carol Chen"}]}`
+
+		if _, writeErr := w.Write([]byte(")]}'\n" + added)); writeErr != nil {
+			t.Errorf("writing stub response: %v", writeErr)
+		}
+	})
+
+	result := callTool(t, srv, "add_reviewer", map[string]any{
+		"change_id": "12345",
+		"reviewer":  "carol@example.com",
+		"state":     "CC",
+	})
+
+	if result.IsError {
+		t.Fatalf("add_reviewer reported an error: %s", resultText(t, result))
+	}
+
+	if gotBody["state"] != "CC" {
+		t.Errorf("state = %v, want CC to be forwarded rather than defaulted away", gotBody["state"])
+	}
+
+	if got := resultText(t, result); !strings.Contains(got, "Carol Chen") {
+		t.Errorf("output = %q, want it to name who was added", got)
+	}
+}

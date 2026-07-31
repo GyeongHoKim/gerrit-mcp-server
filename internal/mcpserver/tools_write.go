@@ -2,6 +2,7 @@ package mcpserver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -156,3 +157,36 @@ func (s *server) deleteDraftComments(
 
 	return text(render.DraftsDeleted(in.ChangeID, deleted)), nil, nil
 }
+
+// addReviewerInput is the argument schema for the add_reviewer tool.
+type addReviewerInput struct {
+	// ChangeID identifies the change.
+	ChangeID string `json:"change_id" jsonschema:"the change number (12345) or the triplet project~branch~Change-Id"`
+	// Reviewer names the account or group to add.
+	Reviewer string `json:"reviewer" jsonschema:"account id, username, email or group name, as returned by suggest_reviewers"`
+	// State selects whether they are expected to vote.
+	State string `json:"state,omitempty" jsonschema:"REVIEWER for someone expected to vote (default) or CC to only keep them informed"`
+	// Confirm acknowledges adding a large group.
+	Confirm bool `json:"confirm,omitempty" jsonschema:"confirm adding a group large enough that Gerrit asks first"`
+}
+
+// registerAddReviewer installs the add_reviewer tool.
+func registerAddReviewer(s *server, srv *mcp.Server) {
+	mcp.AddTool(srv, &mcp.Tool{
+		Name:        "add_reviewer",
+		Description: "Add a reviewer or CC to a Gerrit change. Accepts a person or a group.",
+		Annotations: &mcp.ToolAnnotations{},
+	}, s.addReviewer)
+}
+
+// addReviewer adds one reviewer or CC.
+func (*server) addReviewer(
+	_ context.Context,
+	_ *mcp.CallToolRequest,
+	_ addReviewerInput,
+) (*mcp.CallToolResult, any, error) {
+	return nil, nil, errStubbed
+}
+
+// errStubbed is returned by unimplemented handlers.
+var errStubbed = errors.New("not implemented")

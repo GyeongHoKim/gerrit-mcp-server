@@ -2,6 +2,7 @@ package gerrit
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -62,4 +63,54 @@ func (c *Client) SuggestReviewers(
 	}
 
 	return suggestions, nil
+}
+
+// errStubbed is returned by unimplemented endpoints.
+var errStubbed = errors.New("not implemented")
+
+// Reviewer states for [ReviewerInput.State].
+const (
+	// StateReviewer adds someone who is expected to vote.
+	StateReviewer = "REVIEWER"
+	// StateCC adds someone who is only kept informed.
+	StateCC = "CC"
+)
+
+// ReviewerInput adds one reviewer or CC to a change.
+type ReviewerInput struct {
+	// Reviewer is an account id, username, email or group name.
+	Reviewer string `json:"reviewer"`
+	// State is REVIEWER or CC. Empty means REVIEWER.
+	State string `json:"state,omitempty"`
+	// Confirmed acknowledges adding a group large enough that Gerrit asks
+	// first.
+	Confirmed bool `json:"confirmed,omitempty"`
+}
+
+// ReviewerResult is Gerrit's answer to adding a reviewer.
+type ReviewerResult struct {
+	// Error explains a reviewer Gerrit declined to add.
+	Error string `json:"error,omitempty"`
+	// Reviewers are the accounts added as reviewers.
+	Reviewers []AccountInfo `json:"reviewers,omitempty"`
+	// CCs are the accounts added as CC.
+	CCs []AccountInfo `json:"ccs,omitempty"`
+	// Confirm reports a group large enough that Gerrit wants confirmation
+	// before adding everyone in it.
+	Confirm bool `json:"confirm,omitempty"`
+}
+
+// ErrReviewerRejected reports a reviewer Gerrit declined to add.
+var ErrReviewerRejected = errors.New("gerrit rejected the reviewer")
+
+// ErrConfirmationRequired reports a group Gerrit will only add once the
+// caller says it means to add everyone in it.
+var ErrConfirmationRequired = errors.New("adding this group needs confirmation")
+
+// ErrEmptyReviewer reports a call with nobody to add.
+var ErrEmptyReviewer = errors.New("reviewer must not be empty")
+
+// AddReviewer adds one reviewer or CC to a change.
+func (*Client) AddReviewer(_ context.Context, _ string, _ *ReviewerInput) (*ReviewerResult, error) {
+	return nil, errStubbed
 }

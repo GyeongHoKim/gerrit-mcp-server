@@ -69,3 +69,8 @@ func writeSuggestion(out *strings.Builder, suggestion *gerrit.SuggestedReviewerI
 
 	out.WriteString("unknown suggestion")
 }
+
+// ReviewerAdded confirms who was added to a change.
+func ReviewerAdded(_ string, _ *gerrit.ReviewerResult) string {
+	return ""
+}
