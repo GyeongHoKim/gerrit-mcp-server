@@ -124,3 +124,44 @@ func (c *Client) CreateDraftComment(
 
 	return &draft, nil
 }
+
+// errStubbed is returned by unimplemented endpoints.
+var errStubbed = errors.New("not implemented")
+
+// Draft handling for [ReviewInput.Drafts].
+//
+// Gerrit defaults to KEEP, so publishing is always an explicit request.
+const (
+	// PublishCurrentDrafts publishes drafts on the reviewed revision only.
+	PublishCurrentDrafts = "PUBLISH"
+	// PublishAllDrafts publishes drafts across every revision.
+	PublishAllDrafts = "PUBLISH_ALL_REVISIONS"
+)
+
+// ReviewInput posts a review on a revision.
+type ReviewInput struct {
+	// Drafts says what to do with drafts already staged on the change.
+	Drafts string `json:"drafts,omitempty"`
+	// Message is the cover message left alongside the comments.
+	Message string `json:"message,omitempty"`
+}
+
+// ReviewResult is Gerrit's answer to a posted review.
+type ReviewResult struct {
+	// Error explains a review Gerrit declined to apply.
+	Error string `json:"error,omitempty"`
+	// Ready reports a change taken out of work-in-progress by this review.
+	Ready bool `json:"ready,omitempty"`
+}
+
+// ErrReviewRejected reports a review Gerrit accepted the request for but
+// declined to apply.
+var ErrReviewRejected = errors.New("gerrit rejected the review")
+
+// PublishDrafts publishes the calling account's staged draft comments.
+//
+// allRevisions widens the scope from the current revision to every revision;
+// Gerrit's own default is to publish nothing, so the scope is always stated.
+func (*Client) PublishDrafts(_ context.Context, _, _ string, _ bool) (*ReviewResult, error) {
+	return nil, errStubbed
+}

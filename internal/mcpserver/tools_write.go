@@ -2,6 +2,7 @@ package mcpserver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -61,3 +62,35 @@ func (s *server) postReviewComment(
 
 	return text(render.DraftCreated(draft)), nil, nil
 }
+
+// publishDraftsInput is the argument schema for the publish_drafts tool.
+type publishDraftsInput struct {
+	// ChangeID identifies the change.
+	ChangeID string `json:"change_id" jsonschema:"the change number (12345) or the triplet project~branch~Change-Id"`
+	// Message is the cover message posted with the comments.
+	Message string `json:"message,omitempty" jsonschema:"cover message posted alongside the comments"`
+	// AllRevisions widens the scope beyond the current patch set.
+	AllRevisions bool `json:"all_revisions,omitempty" jsonschema:"also publish drafts left on earlier patch sets; defaults to the current one only"`
+}
+
+// registerPublishDrafts installs the publish_drafts tool.
+func registerPublishDrafts(s *server, srv *mcp.Server) {
+	mcp.AddTool(srv, &mcp.Tool{
+		Name: "publish_drafts",
+		Description: "Publish your staged draft comments on a Gerrit change, making them visible to reviewers. " +
+			"This cannot be undone.",
+		Annotations: &mcp.ToolAnnotations{},
+	}, s.publishDrafts)
+}
+
+// publishDrafts publishes the staged comments.
+func (*server) publishDrafts(
+	_ context.Context,
+	_ *mcp.CallToolRequest,
+	_ publishDraftsInput,
+) (*mcp.CallToolResult, any, error) {
+	return nil, nil, errStubbed
+}
+
+// errStubbed is returned by unimplemented handlers.
+var errStubbed = errors.New("not implemented")

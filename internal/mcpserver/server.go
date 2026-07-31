@@ -39,6 +39,7 @@ var readTools = []toolRegistrar{
 // writeTools modify Gerrit and are registered only when writes are allowed.
 var writeTools = []toolRegistrar{
 	registerPostReviewComment,
+	registerPublishDrafts,
 }
 
 // server carries what the tool handlers need.

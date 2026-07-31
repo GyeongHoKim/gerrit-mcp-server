@@ -145,3 +145,53 @@ func TestPostReviewCommentToolRejectsAnEmptyMessage(t *testing.T) {
 		t.Errorf("error text = %q, want it to name the empty message", got)
 	}
 }
+
+func TestPublishDraftsTool(t *testing.T) {
+	t.Parallel()
+
+	var gotBody map[string]any
+
+	srv := newWritableServerAgainst(t, func(w http.ResponseWriter, r *http.Request) {
+		body, readErr := io.ReadAll(r.Body)
+		if readErr != nil {
+			t.Errorf("reading request body: %v", readErr)
+		}
+
+		if decodeErr := json.Unmarshal(body, &gotBody); decodeErr != nil {
+			t.Errorf("decoding request body %q: %v", body, decodeErr)
+		}
+
+		if _, writeErr := w.Write([]byte(")]}'\n{}")); writeErr != nil {
+			t.Errorf("writing stub response: %v", writeErr)
+		}
+	})
+
+	result := callTool(t, srv, "publish_drafts", map[string]any{
+		"change_id": "12345",
+		"message":   "looks good",
+	})
+
+	if result.IsError {
+		t.Fatalf("publish_drafts reported an error: %s", resultText(t, result))
+	}
+
+	// Omitting all_revisions must publish the current patch set only, not
+	// quietly sweep up stale drafts from earlier ones.
+	if gotBody["drafts"] != "PUBLISH" {
+		t.Errorf("drafts = %v, want PUBLISH for the default scope", gotBody["drafts"])
+	}
+
+	if got := resultText(t, result); !strings.Contains(strings.ToLower(got), "published") {
+		t.Errorf("output = %q, want it to confirm the comments are now visible", got)
+	}
+}
+
+func TestPublishDraftsToolIsGatedOnWrites(t *testing.T) {
+	t.Parallel()
+
+	names := toolNames(t, newServerAgainst(t, func(_ http.ResponseWriter, _ *http.Request) {}))
+
+	if slices.Contains(names, "publish_drafts") {
+		t.Error("publish_drafts is exposed on a read-only server")
+	}
+}

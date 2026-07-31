@@ -187,3 +187,8 @@ func DraftCreated(draft *gerrit.CommentInfo) string {
 
 	return out.String()
 }
+
+// DraftsPublished confirms that staged comments are now visible.
+func DraftsPublished(_ string, _ bool) string {
+	return ""
+}
