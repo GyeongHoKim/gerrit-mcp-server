@@ -395,3 +395,46 @@ func TestListChangeCommentsTool(t *testing.T) {
 		}
 	}
 }
+
+func TestListDraftCommentsTool(t *testing.T) {
+	t.Parallel()
+
+	const body = `{
+	  "src/widget.go": [
+	    {"id": "d1", "line": 10, "message": "still thinking", "patch_set": 3,
+	     "updated": "2026-07-31 06:04:05.000000000"}
+	  ]
+	}`
+
+	var gotPath string
+
+	srv := newServerAgainst(t, func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.EscapedPath()
+
+		if _, err := w.Write([]byte(")]}'\n" + body)); err != nil {
+			t.Errorf("writing stub response: %v", err)
+		}
+	})
+
+	result := callTool(t, srv, "list_draft_comments", map[string]any{"change_id": "12345"})
+
+	if result.IsError {
+		t.Fatalf("list_draft_comments reported an error: %s", resultText(t, result))
+	}
+
+	// Drafts come from /drafts, not /comments. Getting this wrong would show
+	// the model everyone's published review instead of its own notes.
+	if want := "/a/changes/12345/drafts"; gotPath != want {
+		t.Errorf("path = %q, want %q", gotPath, want)
+	}
+
+	got := resultText(t, result)
+
+	if !strings.Contains(got, "draft comment") {
+		t.Errorf("output does not say these are drafts:\n%s", got)
+	}
+
+	if !strings.Contains(got, "still thinking") {
+		t.Errorf("output lost the draft body:\n%s", got)
+	}
+}
