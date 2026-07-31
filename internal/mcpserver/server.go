@@ -41,6 +41,7 @@ var writeTools = []toolRegistrar{
 	registerPostReviewComment,
 	registerPublishDrafts,
 	registerDeleteDraftComment,
+	registerDeleteDraftComments,
 }
 
 // server carries what the tool handlers need.

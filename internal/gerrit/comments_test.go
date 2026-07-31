@@ -5,7 +5,11 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"path"
+	"slices"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 const commentsBody = `{
@@ -278,5 +282,102 @@ func TestDeleteDraftCommentRejectsEmptyArguments(t *testing.T) {
 				t.Errorf("DeleteDraftComment() error = %v, want %v", err, test.want)
 			}
 		})
+	}
+}
+
+func TestDeleteAllDraftComments(t *testing.T) {
+	t.Parallel()
+
+	const drafts = `{
+	  "src/widget.go": [{"id": "d1", "line": 10, "message": "one"}, {"id": "d2", "line": 20, "message": "two"}],
+	  "src/other.go": [{"id": "d3", "message": "three"}]
+	}`
+
+	var deleted []string
+
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			if _, err := w.Write([]byte(xssiPrefix + "\n" + drafts)); err != nil {
+				t.Errorf("writing test response: %v", err)
+			}
+
+			return
+		}
+
+		deleted = append(deleted, path.Base(r.URL.EscapedPath()))
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	count, err := client.DeleteAllDraftComments(t.Context(), "12345")
+	if err != nil {
+		t.Fatalf("DeleteAllDraftComments() returned an unexpected error: %v", err)
+	}
+
+	if count != 3 {
+		t.Errorf("count = %d, want 3", count)
+	}
+
+	slices.Sort(deleted)
+
+	if diff := cmp.Diff([]string{"d1", "d2", "d3"}, deleted); diff != "" {
+		t.Errorf("deleted drafts mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestDeleteAllDraftCommentsWithNothingStaged(t *testing.T) {
+	t.Parallel()
+
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Errorf("unexpected %s request, want no deletions when nothing is staged", r.Method)
+		}
+
+		if _, err := w.Write([]byte(xssiPrefix + "\n{}")); err != nil {
+			t.Errorf("writing test response: %v", err)
+		}
+	})
+
+	count, err := client.DeleteAllDraftComments(t.Context(), "12345")
+	if err != nil {
+		t.Fatalf("DeleteAllDraftComments() returned an unexpected error: %v", err)
+	}
+
+	if count != 0 {
+		t.Errorf("count = %d, want 0", count)
+	}
+}
+
+func TestDeleteAllDraftCommentsReportsPartialProgress(t *testing.T) {
+	t.Parallel()
+
+	const drafts = `{"src/widget.go": [{"id": "d1"}, {"id": "d2"}]}`
+
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			if _, err := w.Write([]byte(xssiPrefix + "\n" + drafts)); err != nil {
+				t.Errorf("writing test response: %v", err)
+			}
+
+			return
+		}
+
+		// The second deletion fails. The first one already happened and
+		// cannot be taken back, so the count has to say so.
+		if path.Base(r.URL.EscapedPath()) == "d2" {
+			w.WriteHeader(http.StatusConflict)
+
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	count, err := client.DeleteAllDraftComments(t.Context(), "12345")
+	if err == nil {
+		t.Fatal("DeleteAllDraftComments() succeeded, want the failed deletion reported")
+	}
+
+	if count != 1 {
+		t.Errorf("count = %d, want 1 -- the first deletion is not undone by the second failing", count)
 	}
 }

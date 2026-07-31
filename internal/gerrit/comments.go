@@ -215,3 +215,16 @@ func (c *Client) DeleteDraftComment(ctx context.Context, changeID, draftID strin
 
 	return c.do(ctx, http.MethodDelete, path, nil, nil, nil)
 }
+
+// errStubbed is returned by unimplemented endpoints.
+var errStubbed = errors.New("not implemented")
+
+// DeleteAllDraftComments discards every draft the calling account has staged
+// on a change, and reports how many it removed.
+//
+// Gerrit has no bulk delete, so this lists the drafts and removes them one at
+// a time. A failure part way through leaves the earlier deletions in place --
+// they are already gone -- and reports what happened.
+func (*Client) DeleteAllDraftComments(_ context.Context, _ string) (int, error) {
+	return 0, errStubbed
+}

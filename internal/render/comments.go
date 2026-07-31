@@ -203,3 +203,8 @@ func DraftsPublished(changeID string, allRevisions bool) string {
 func DraftDeleted(changeID, draftID string) string {
 	return "Draft comment " + draftID + " on change " + changeID + " is discarded.\n"
 }
+
+// DraftsDeleted confirms how many staged comments were discarded.
+func DraftsDeleted(_ string, _ int) string {
+	return ""
+}

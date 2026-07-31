@@ -248,3 +248,31 @@ func TestDestructiveToolsCarryTheDestructiveHint(t *testing.T) {
 		}
 	}
 }
+
+func TestDeleteDraftCommentsTool(t *testing.T) {
+	t.Parallel()
+
+	const drafts = `{"src/widget.go": [{"id": "d1"}, {"id": "d2"}]}`
+
+	srv := newWritableServerAgainst(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			if _, err := w.Write([]byte(")]}'\n" + drafts)); err != nil {
+				t.Errorf("writing stub response: %v", err)
+			}
+
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	result := callTool(t, srv, "delete_draft_comments", map[string]any{"change_id": "12345"})
+
+	if result.IsError {
+		t.Fatalf("delete_draft_comments reported an error: %s", resultText(t, result))
+	}
+
+	if got := resultText(t, result); !strings.Contains(got, "2") {
+		t.Errorf("output = %q, want it to say how many drafts were discarded", got)
+	}
+}
