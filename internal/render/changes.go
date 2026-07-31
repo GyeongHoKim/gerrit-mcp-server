@@ -112,6 +112,20 @@ func writeChange(out *strings.Builder, change *gerrit.ChangeInfo) {
 //
 // An empty list is not "no results": it means the change submits on its own,
 // which is what the caller actually wanted to know.
-func SubmittedTogether(_ []gerrit.ChangeInfo) string {
-	return ""
+func SubmittedTogether(changes []gerrit.ChangeInfo) string {
+	if len(changes) == 0 {
+		return "This change submits by itself.\n"
+	}
+
+	var out strings.Builder
+
+	out.WriteString(strconv.Itoa(len(changes)))
+	out.WriteString(" changes submit together, including this one.\n")
+
+	for i := range changes {
+		out.WriteString("\n")
+		writeChange(&out, &changes[i])
+	}
+
+	return out.String()
 }
