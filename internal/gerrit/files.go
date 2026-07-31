@@ -3,10 +3,9 @@ package gerrit
 import (
 	"context"
 	"errors"
+	"net/http"
+	"strings"
 )
-
-// errStubbed is returned by unimplemented endpoints.
-var errStubbed = errors.New("not implemented")
 
 // ErrEmptyFilePath reports a call with no file to act on.
 var ErrEmptyFilePath = errors.New("file path must not be empty")
@@ -33,8 +32,6 @@ type FileInfo struct {
 //
 // Everything uses the literal revision "current" rather than resolving a patch
 // set first: Gerrit accepts it, and it saves a round trip on every call.
-//
-//nolint:unused // the implementation commit routes through it
 func revisionPath(changeID, suffix string) string {
 	return changePath(changeID, "/revisions/current"+suffix)
 }
@@ -44,6 +41,16 @@ func revisionPath(changeID, suffix string) string {
 //
 // The result includes Gerrit's pseudo-entries such as /COMMIT_MSG, which are
 // what a reviewer sees in the UI.
-func (*Client) ListFiles(_ context.Context, _ string) (map[string]FileInfo, error) {
-	return nil, errStubbed
+func (c *Client) ListFiles(ctx context.Context, changeID string) (map[string]FileInfo, error) {
+	changeID = strings.TrimSpace(changeID)
+	if changeID == "" {
+		return nil, ErrEmptyChangeID
+	}
+
+	files := map[string]FileInfo{}
+	if err := c.do(ctx, http.MethodGet, revisionPath(changeID, "/files/"), nil, nil, &files); err != nil {
+		return nil, err
+	}
+
+	return files, nil
 }

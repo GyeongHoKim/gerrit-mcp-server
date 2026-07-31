@@ -2,7 +2,6 @@ package mcpserver
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -105,13 +104,15 @@ func registerListChangeFiles(s *server, srv *mcp.Server) {
 }
 
 // listChangeFiles lists the files a change touches.
-func (*server) listChangeFiles(
-	_ context.Context,
+func (s *server) listChangeFiles(
+	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ changeIDInput,
+	in changeIDInput,
 ) (*mcp.CallToolResult, any, error) {
-	return nil, nil, errStubbed
-}
+	files, err := s.gerrit.ListFiles(ctx, in.ChangeID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("listing files for %s: %w", in.ChangeID, err)
+	}
 
-// errStubbed is returned by unimplemented handlers.
-var errStubbed = errors.New("not implemented")
+	return text(render.Files(files)), nil, nil
+}
