@@ -190,3 +190,17 @@ func (c *Client) PublishDrafts(
 
 	return &result, nil
 }
+
+// errStubbed is returned by unimplemented endpoints.
+var errStubbed = errors.New("not implemented")
+
+// ErrEmptyDraftID reports a call with no draft to act on.
+var ErrEmptyDraftID = errors.New("draft id must not be empty")
+
+// DeleteDraftComment removes one staged comment.
+//
+// Only drafts can be deleted this way. A published comment stays on the
+// record; Gerrit has no delete for it that an ordinary account may use.
+func (*Client) DeleteDraftComment(_ context.Context, _, _ string) error {
+	return errStubbed
+}

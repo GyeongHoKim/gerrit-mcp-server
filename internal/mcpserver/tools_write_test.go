@@ -195,3 +195,56 @@ func TestPublishDraftsToolIsGatedOnWrites(t *testing.T) {
 		t.Error("publish_drafts is exposed on a read-only server")
 	}
 }
+
+func TestDeleteDraftCommentTool(t *testing.T) {
+	t.Parallel()
+
+	var gotPath string
+
+	srv := newWritableServerAgainst(t, func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.EscapedPath()
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	result := callTool(t, srv, "delete_draft_comment", map[string]any{
+		"change_id": "12345",
+		"draft_id":  "d1",
+	})
+
+	if result.IsError {
+		t.Fatalf("delete_draft_comment reported an error: %s", resultText(t, result))
+	}
+
+	if want := "/a/changes/12345/revisions/current/drafts/d1"; gotPath != want {
+		t.Errorf("path = %q, want %q", gotPath, want)
+	}
+}
+
+func TestDestructiveToolsCarryTheDestructiveHint(t *testing.T) {
+	t.Parallel()
+
+	srv := newWritableServerAgainst(t, func(_ http.ResponseWriter, _ *http.Request) {})
+
+	listed, err := connect(t, srv).ListTools(t.Context(), nil)
+	if err != nil {
+		t.Fatalf("listing tools: %v", err)
+	}
+
+	// A client may warn or confirm before running a destructive tool, but only
+	// if we tell it which ones those are.
+	destructive := []string{"delete_draft_comment"}
+
+	for _, name := range destructive {
+		index := slices.IndexFunc(listed.Tools, func(tool *mcp.Tool) bool { return tool.Name == name })
+		if index < 0 {
+			t.Errorf("%s is not registered on a writable server", name)
+
+			continue
+		}
+
+		annotations := listed.Tools[index].Annotations
+		if annotations == nil || annotations.DestructiveHint == nil || !*annotations.DestructiveHint {
+			t.Errorf("%s is missing the destructive annotation", name)
+		}
+	}
+}

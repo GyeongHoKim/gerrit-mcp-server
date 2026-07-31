@@ -2,6 +2,7 @@ package mcpserver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -94,3 +95,36 @@ func (s *server) publishDrafts(
 
 	return text(render.DraftsPublished(in.ChangeID, in.AllRevisions)), nil, nil
 }
+
+// deleteDraftCommentInput is the argument schema for the
+// delete_draft_comment tool.
+type deleteDraftCommentInput struct {
+	// ChangeID identifies the change.
+	ChangeID string `json:"change_id" jsonschema:"the change number (12345) or the triplet project~branch~Change-Id"`
+	// DraftID identifies the staged comment.
+	DraftID string `json:"draft_id" jsonschema:"id of the draft to discard, as returned by list_draft_comments"`
+}
+
+// registerDeleteDraftComment installs the delete_draft_comment tool.
+func registerDeleteDraftComment(s *server, srv *mcp.Server) {
+	destructive := true
+
+	mcp.AddTool(srv, &mcp.Tool{
+		Name: "delete_draft_comment",
+		Description: "Discard one of your staged draft comments on a Gerrit change. " +
+			"The draft is gone; this cannot be undone.",
+		Annotations: &mcp.ToolAnnotations{DestructiveHint: &destructive},
+	}, s.deleteDraftComment)
+}
+
+// deleteDraftComment discards one staged comment.
+func (*server) deleteDraftComment(
+	_ context.Context,
+	_ *mcp.CallToolRequest,
+	_ deleteDraftCommentInput,
+) (*mcp.CallToolResult, any, error) {
+	return nil, nil, errStubbed
+}
+
+// errStubbed is returned by unimplemented handlers.
+var errStubbed = errors.New("not implemented")

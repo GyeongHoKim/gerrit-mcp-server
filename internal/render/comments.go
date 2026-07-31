@@ -198,3 +198,8 @@ func DraftsPublished(changeID string, allRevisions bool) string {
 	return "Draft comments on " + scope + " of change " + changeID +
 		" are published and now visible to reviewers.\n"
 }
+
+// DraftDeleted confirms one staged comment was discarded.
+func DraftDeleted(_, _ string) string {
+	return ""
+}

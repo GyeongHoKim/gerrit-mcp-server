@@ -225,3 +225,58 @@ func TestPublishDraftsRejectsEmptyID(t *testing.T) {
 		t.Errorf("PublishDrafts() error = %v, want ErrEmptyChangeID", err)
 	}
 }
+
+func TestDeleteDraftComment(t *testing.T) {
+	t.Parallel()
+
+	var (
+		gotMethod string
+		gotPath   string
+	)
+
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		gotMethod = r.Method
+		gotPath = r.URL.EscapedPath()
+
+		// Gerrit answers a draft deletion with 204 and no body at all.
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	if err := client.DeleteDraftComment(t.Context(), "12345", "d1"); err != nil {
+		t.Fatalf("DeleteDraftComment() returned an unexpected error: %v", err)
+	}
+
+	if gotMethod != http.MethodDelete {
+		t.Errorf("method = %s, want DELETE", gotMethod)
+	}
+
+	if want := "/a/changes/12345/revisions/current/drafts/d1"; gotPath != want {
+		t.Errorf("path = %q, want %q", gotPath, want)
+	}
+}
+
+func TestDeleteDraftCommentRejectsEmptyArguments(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		want              error
+		changeID, draftID string
+	}{
+		"no change": {changeID: " ", draftID: "d1", want: ErrEmptyChangeID},
+		"no draft":  {changeID: "12345", draftID: "  ", want: ErrEmptyDraftID},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			client := newTestClient(t, func(_ http.ResponseWriter, _ *http.Request) {
+				t.Error("DeleteDraftComment() reached the server, want it to refuse before that")
+			})
+
+			if err := client.DeleteDraftComment(t.Context(), test.changeID, test.draftID); !errors.Is(err, test.want) {
+				t.Errorf("DeleteDraftComment() error = %v, want %v", err, test.want)
+			}
+		})
+	}
+}
