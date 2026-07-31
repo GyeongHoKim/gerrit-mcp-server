@@ -427,3 +427,72 @@ func TestRevertChangeToolNamesTheNewChange(t *testing.T) {
 		t.Errorf("output = %q, want it to say the revert still needs review", got)
 	}
 }
+
+func TestRevertSubmissionToolNamesEveryRevert(t *testing.T) {
+	t.Parallel()
+
+	srv := newWritableServerAgainst(t, func(w http.ResponseWriter, _ *http.Request) {
+		const reverts = `{"revert_changes": [
+		  {"_number": 101, "project": "p", "branch": "main", "subject": "Revert one", "status": "NEW"},
+		  {"_number": 102, "project": "q", "branch": "main", "subject": "Revert two", "status": "NEW"}
+		]}`
+
+		if _, err := w.Write([]byte(")]}'\n" + reverts)); err != nil {
+			t.Errorf("writing stub response: %v", err)
+		}
+	})
+
+	result := callTool(t, srv, "revert_submission", map[string]any{
+		"change_id": "12345",
+		"message":   "broke the build",
+	})
+
+	if result.IsError {
+		t.Fatalf("revert_submission reported an error: %s", resultText(t, result))
+	}
+
+	// Every revert has to be named. An agent that sees only one will not
+	// follow up on the others it just created.
+	got := resultText(t, result)
+
+	for _, want := range []string{"101", "102"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("output does not name revert %s:\n%s", want, got)
+		}
+	}
+}
+
+func TestCreateChangeTool(t *testing.T) {
+	t.Parallel()
+
+	var gotPath string
+
+	srv := newWritableServerAgainst(t, func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.EscapedPath()
+
+		const created = `{"_number": 500, "project": "p", "branch": "main",
+		  "subject": "add the thing", "status": "NEW"}`
+
+		if _, err := w.Write([]byte(")]}'\n" + created)); err != nil {
+			t.Errorf("writing stub response: %v", err)
+		}
+	})
+
+	result := callTool(t, srv, "create_change", map[string]any{
+		"project": "p",
+		"branch":  "main",
+		"subject": "add the thing",
+	})
+
+	if result.IsError {
+		t.Fatalf("create_change reported an error: %s", resultText(t, result))
+	}
+
+	if want := "/a/changes/"; gotPath != want {
+		t.Errorf("path = %q, want %q", gotPath, want)
+	}
+
+	if got := resultText(t, result); !strings.Contains(got, "500") {
+		t.Errorf("output = %q, want it to name the change created", got)
+	}
+}

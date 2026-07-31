@@ -2,6 +2,7 @@ package mcpserver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -335,3 +336,60 @@ func (s *server) revertChange(
 
 	return text(render.ChangeReverted(in.ChangeID, revert)), nil, nil
 }
+
+// createChangeInput is the argument schema for the create_change tool.
+type createChangeInput struct {
+	// Project is the repository the change targets.
+	Project string `json:"project" jsonschema:"the Gerrit project (repository) name"`
+	// Branch is the target branch.
+	Branch string `json:"branch" jsonschema:"target branch, without the refs/heads/ prefix"`
+	// Subject is the first line of the commit message.
+	Subject string `json:"subject" jsonschema:"first line of the commit message"`
+	// Topic groups the change with others.
+	Topic string `json:"topic,omitempty" jsonschema:"optional topic to group this change with others"`
+	// WorkInProgress starts the change without asking for review.
+	WorkInProgress bool `json:"work_in_progress,omitempty" jsonschema:"open the change without asking for review yet"`
+}
+
+// registerCreateChange installs the create_change tool.
+func registerCreateChange(s *server, srv *mcp.Server) {
+	mcp.AddTool(srv, &mcp.Tool{
+		Name: "create_change",
+		Description: "Open a new empty Gerrit change. It has no content until an edit is published " +
+			"to it; this creates the review to hang that on.",
+		Annotations: &mcp.ToolAnnotations{},
+	}, s.createChange)
+}
+
+// createChange opens a new change.
+func (*server) createChange(
+	_ context.Context,
+	_ *mcp.CallToolRequest,
+	_ createChangeInput,
+) (*mcp.CallToolResult, any, error) {
+	return nil, nil, errStubbed
+}
+
+// registerRevertSubmission installs the revert_submission tool.
+func registerRevertSubmission(s *server, srv *mcp.Server) {
+	destructive := true
+
+	mcp.AddTool(srv, &mcp.Tool{
+		Name: "revert_submission",
+		Description: "Create changes reverting every change submitted together with this one. " +
+			"The reverts still have to be reviewed and submitted.",
+		Annotations: &mcp.ToolAnnotations{DestructiveHint: &destructive},
+	}, s.revertSubmission)
+}
+
+// revertSubmission reverts a whole submission.
+func (*server) revertSubmission(
+	_ context.Context,
+	_ *mcp.CallToolRequest,
+	_ changeMessageInput,
+) (*mcp.CallToolResult, any, error) {
+	return nil, nil, errStubbed
+}
+
+// errStubbed is returned by unimplemented handlers.
+var errStubbed = errors.New("not implemented")

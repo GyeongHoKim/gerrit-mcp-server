@@ -47,3 +47,13 @@ func ChangeReverted(changeID string, revert *gerrit.ChangeInfo) string {
 
 	return out.String()
 }
+
+// ChangeCreated names a newly opened change.
+func ChangeCreated(_ *gerrit.ChangeInfo) string {
+	return ""
+}
+
+// SubmissionReverted names the changes created to undo a submission.
+func SubmissionReverted(_ string, _ *gerrit.RevertSubmissionInfo) string {
+	return ""
+}

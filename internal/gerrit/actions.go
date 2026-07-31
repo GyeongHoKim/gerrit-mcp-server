@@ -2,6 +2,7 @@ package gerrit
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 )
@@ -91,4 +92,44 @@ func (c *Client) postForChange(ctx context.Context, changeID, suffix, message st
 	}
 
 	return &change, nil
+}
+
+// errStubbed is returned by unimplemented endpoints.
+var errStubbed = errors.New("not implemented")
+
+// ChangeInput creates a change.
+type ChangeInput struct {
+	// Project is the repository the change targets.
+	Project string `json:"project"`
+	// Branch is the target branch, without refs/heads/.
+	Branch string `json:"branch"`
+	// Subject is the first line of the commit message.
+	Subject string `json:"subject"`
+	// Topic groups the change with others.
+	Topic string `json:"topic,omitempty"`
+	// WorkInProgress starts the change without asking for review.
+	WorkInProgress bool `json:"work_in_progress,omitempty"`
+}
+
+// ErrIncompleteChange reports a change missing something Gerrit requires.
+var ErrIncompleteChange = errors.New("project, branch and subject are all required")
+
+// CreateChange opens a new empty change.
+//
+// The change has no content until an edit is published to it; this only
+// creates the review to hang that on.
+func (*Client) CreateChange(_ context.Context, _ *ChangeInput) (*ChangeInfo, error) {
+	return nil, errStubbed
+}
+
+// RevertSubmissionInfo names the changes created to undo a submission.
+type RevertSubmissionInfo struct {
+	// RevertChanges are the reverts, one per change in the submission.
+	RevertChanges []ChangeInfo `json:"revert_changes"`
+}
+
+// RevertSubmission creates a change reverting every change submitted
+// alongside this one.
+func (*Client) RevertSubmission(_ context.Context, _, _ string) (*RevertSubmissionInfo, error) {
+	return nil, errStubbed
 }
