@@ -233,12 +233,24 @@ func TestPublishDraftsRejectsEmptyID(t *testing.T) {
 func TestDeleteDraftComment(t *testing.T) {
 	t.Parallel()
 
+	// The draft was written on patch set 2 while the change is further along,
+	// which is the case that a delete against "current" gets wrong.
+	const drafts = `{"src/widget.go": [{"id": "d1", "patch_set": 2, "message": "one"}]}`
+
 	var (
 		gotMethod string
 		gotPath   string
 	)
 
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			if _, err := w.Write([]byte(xssiPrefix + "\n" + drafts)); err != nil {
+				t.Errorf("writing test response: %v", err)
+			}
+
+			return
+		}
+
 		gotMethod = r.Method
 		gotPath = r.URL.EscapedPath()
 
@@ -252,6 +264,37 @@ func TestDeleteDraftComment(t *testing.T) {
 
 	if gotMethod != http.MethodDelete {
 		t.Errorf("method = %s, want DELETE", gotMethod)
+	}
+
+	if want := "/a/changes/12345/revisions/2/drafts/d1"; gotPath != want {
+		t.Errorf("path = %q, want %q", gotPath, want)
+	}
+}
+
+func TestDeleteDraftCommentWithoutAKnownPatchSet(t *testing.T) {
+	t.Parallel()
+
+	// Nothing staged carries this id, so there is no patch set to aim at and
+	// the current revision is the only thing left to try.
+	const drafts = `{"src/widget.go": [{"id": "d2", "patch_set": 2}]}`
+
+	var gotPath string
+
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			if _, err := w.Write([]byte(xssiPrefix + "\n" + drafts)); err != nil {
+				t.Errorf("writing test response: %v", err)
+			}
+
+			return
+		}
+
+		gotPath = r.URL.EscapedPath()
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	if err := client.DeleteDraftComment(t.Context(), "12345", "d1"); err != nil {
+		t.Fatalf("DeleteDraftComment() returned an unexpected error: %v", err)
 	}
 
 	if want := "/a/changes/12345/revisions/current/drafts/d1"; gotPath != want {
@@ -288,8 +331,14 @@ func TestDeleteDraftCommentRejectsEmptyArguments(t *testing.T) {
 func TestDeleteAllDraftComments(t *testing.T) {
 	t.Parallel()
 
+	// Drafts survive a new patch set, so a change under review for any length
+	// of time has them spread across several. Each has to be deleted where it
+	// actually lives.
 	const drafts = `{
-	  "src/widget.go": [{"id": "d1", "line": 10, "message": "one"}, {"id": "d2", "line": 20, "message": "two"}],
+	  "src/widget.go": [
+	    {"id": "d1", "patch_set": 1, "line": 10, "message": "one"},
+	    {"id": "d2", "patch_set": 3, "line": 20, "message": "two"}
+	  ],
 	  "src/other.go": [{"id": "d3", "message": "three"}]
 	}`
 
@@ -304,7 +353,7 @@ func TestDeleteAllDraftComments(t *testing.T) {
 			return
 		}
 
-		deleted = append(deleted, path.Base(r.URL.EscapedPath()))
+		deleted = append(deleted, r.URL.EscapedPath())
 		w.WriteHeader(http.StatusNoContent)
 	})
 
@@ -319,7 +368,14 @@ func TestDeleteAllDraftComments(t *testing.T) {
 
 	slices.Sort(deleted)
 
-	if diff := cmp.Diff([]string{"d1", "d2", "d3"}, deleted); diff != "" {
+	// d3 named no patch set, so it can only be deleted against the current one.
+	want := []string{
+		"/a/changes/12345/revisions/1/drafts/d1",
+		"/a/changes/12345/revisions/3/drafts/d2",
+		"/a/changes/12345/revisions/current/drafts/d3",
+	}
+
+	if diff := cmp.Diff(want, deleted); diff != "" {
 		t.Errorf("deleted drafts mismatch (-want +got):\n%s", diff)
 	}
 }

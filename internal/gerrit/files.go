@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 )
 
@@ -35,6 +36,20 @@ type FileInfo struct {
 // set first: Gerrit accepts it, and it saves a round trip on every call.
 func revisionPath(changeID, suffix string) string {
 	return changePath(changeID, "/revisions/current"+suffix)
+}
+
+// patchSetPath returns a path under one specific patch set of a change, or
+// under the current one when the patch set is unknown.
+//
+// Anything addressed by id rather than by content needs this: a draft comment
+// belongs to the patch set it was written on, and Gerrit answers 404 when it
+// is asked for on any other.
+func patchSetPath(changeID string, patchSet int, suffix string) string {
+	if patchSet <= 0 {
+		return revisionPath(changeID, suffix)
+	}
+
+	return changePath(changeID, "/revisions/"+strconv.Itoa(patchSet)+suffix)
 }
 
 // ListFiles lists the files touched by a change's current patch set, keyed by

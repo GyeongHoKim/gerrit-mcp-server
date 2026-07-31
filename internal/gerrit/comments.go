@@ -201,6 +201,10 @@ var ErrEmptyDraftID = errors.New("draft id must not be empty")
 //
 // Only drafts can be deleted this way. A published comment stays on the
 // record; Gerrit has no delete for it that an ordinary account may use.
+//
+// The draft is looked up first because the delete endpoint is scoped to a
+// revision and a draft written on patch set 2 is not reachable through patch
+// set 3. The caller only has an id, so the patch set has to be found.
 func (c *Client) DeleteDraftComment(ctx context.Context, changeID, draftID string) error {
 	changeID = strings.TrimSpace(changeID)
 	if changeID == "" {
@@ -212,8 +216,36 @@ func (c *Client) DeleteDraftComment(ctx context.Context, changeID, draftID strin
 		return ErrEmptyDraftID
 	}
 
+	byFile, err := c.ListDraftComments(ctx, changeID)
+	if err != nil {
+		return err
+	}
+
+	return c.deleteDraft(ctx, changeID, draftID, draftPatchSet(byFile, draftID))
+}
+
+// draftPatchSet reports which patch set a draft was written on, or zero when
+// no draft in the collection carries that id.
+func draftPatchSet(byFile map[string][]CommentInfo, draftID string) int {
+	for _, drafts := range byFile {
+		for i := range drafts {
+			if drafts[i].ID == draftID {
+				return drafts[i].PatchSet
+			}
+		}
+	}
+
+	return 0
+}
+
+// deleteDraft removes one staged comment from a known patch set.
+//
+// A patch set of zero falls back to the current revision, which is both what
+// Gerrit assumes and the only thing left to try for a draft that did not say
+// where it lives.
+func (c *Client) deleteDraft(ctx context.Context, changeID, draftID string, patchSet int) error {
 	// A nil out discards the response: Gerrit answers 204 with no body.
-	path := revisionPath(changeID, "/drafts/"+url.PathEscape(draftID))
+	path := patchSetPath(changeID, patchSet, "/drafts/"+url.PathEscape(draftID))
 
 	return c.do(ctx, http.MethodDelete, path, nil, nil, nil)
 }
@@ -237,7 +269,10 @@ func (c *Client) DeleteAllDraftComments(ctx context.Context, changeID string) (i
 	for _, file := range slices.Sorted(maps.Keys(byFile)) {
 		drafts := byFile[file]
 		for i := range drafts {
-			if deleteErr := c.DeleteDraftComment(ctx, changeID, drafts[i].ID); deleteErr != nil {
+			// The listing already said which patch set each draft is on, so
+			// this deletes against it directly rather than looking it up again.
+			deleteErr := c.deleteDraft(ctx, changeID, drafts[i].ID, drafts[i].PatchSet)
+			if deleteErr != nil {
 				return deleted, fmt.Errorf("discarding draft %s on %s: %w", drafts[i].ID, file, deleteErr)
 			}
 

@@ -199,9 +199,21 @@ func TestPublishDraftsToolIsGatedOnWrites(t *testing.T) {
 func TestDeleteDraftCommentTool(t *testing.T) {
 	t.Parallel()
 
+	// The tool is handed an id and nothing else, so the client looks the draft
+	// up to find the patch set it belongs to before deleting it there.
+	const drafts = `{"src/widget.go": [{"id": "d1", "patch_set": 2}]}`
+
 	var gotPath string
 
 	srv := newWritableServerAgainst(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			if _, err := w.Write([]byte(")]}'\n" + drafts)); err != nil {
+				t.Errorf("writing stub response: %v", err)
+			}
+
+			return
+		}
+
 		gotPath = r.URL.EscapedPath()
 		w.WriteHeader(http.StatusNoContent)
 	})
@@ -215,7 +227,7 @@ func TestDeleteDraftCommentTool(t *testing.T) {
 		t.Fatalf("delete_draft_comment reported an error: %s", resultText(t, result))
 	}
 
-	if want := "/a/changes/12345/revisions/current/drafts/d1"; gotPath != want {
+	if want := "/a/changes/12345/revisions/2/drafts/d1"; gotPath != want {
 		t.Errorf("path = %q, want %q", gotPath, want)
 	}
 }
