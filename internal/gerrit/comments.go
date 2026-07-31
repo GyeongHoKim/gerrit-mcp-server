@@ -3,6 +3,7 @@ package gerrit
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 )
@@ -125,9 +126,6 @@ func (c *Client) CreateDraftComment(
 	return &draft, nil
 }
 
-// errStubbed is returned by unimplemented endpoints.
-var errStubbed = errors.New("not implemented")
-
 // Draft handling for [ReviewInput.Drafts].
 //
 // Gerrit defaults to KEEP, so publishing is always an explicit request.
@@ -162,6 +160,33 @@ var ErrReviewRejected = errors.New("gerrit rejected the review")
 //
 // allRevisions widens the scope from the current revision to every revision;
 // Gerrit's own default is to publish nothing, so the scope is always stated.
-func (*Client) PublishDrafts(_ context.Context, _, _ string, _ bool) (*ReviewResult, error) {
-	return nil, errStubbed
+func (c *Client) PublishDrafts(
+	ctx context.Context,
+	changeID, message string,
+	allRevisions bool,
+) (*ReviewResult, error) {
+	changeID = strings.TrimSpace(changeID)
+	if changeID == "" {
+		return nil, ErrEmptyChangeID
+	}
+
+	drafts := PublishCurrentDrafts
+	if allRevisions {
+		drafts = PublishAllDrafts
+	}
+
+	in := ReviewInput{Drafts: drafts, Message: strings.TrimSpace(message)}
+
+	var result ReviewResult
+	if err := c.do(ctx, http.MethodPost, revisionPath(changeID, "/review"), nil, in, &result); err != nil {
+		return nil, err
+	}
+
+	// Gerrit reports a review it declined inside a 200 response, so the status
+	// alone does not say whether anything was applied.
+	if result.Error != "" {
+		return nil, fmt.Errorf("%w: %s", ErrReviewRejected, result.Error)
+	}
+
+	return &result, nil
 }

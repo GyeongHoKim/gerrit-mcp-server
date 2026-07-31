@@ -189,6 +189,12 @@ func DraftCreated(draft *gerrit.CommentInfo) string {
 }
 
 // DraftsPublished confirms that staged comments are now visible.
-func DraftsPublished(_ string, _ bool) string {
-	return ""
+func DraftsPublished(changeID string, allRevisions bool) string {
+	scope := "the current patch set"
+	if allRevisions {
+		scope = "every patch set"
+	}
+
+	return "Draft comments on " + scope + " of change " + changeID +
+		" are published and now visible to reviewers.\n"
 }

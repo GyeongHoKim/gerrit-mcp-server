@@ -2,7 +2,6 @@ package mcpserver
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -84,13 +83,14 @@ func registerPublishDrafts(s *server, srv *mcp.Server) {
 }
 
 // publishDrafts publishes the staged comments.
-func (*server) publishDrafts(
-	_ context.Context,
+func (s *server) publishDrafts(
+	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ publishDraftsInput,
+	in publishDraftsInput,
 ) (*mcp.CallToolResult, any, error) {
-	return nil, nil, errStubbed
-}
+	if _, err := s.gerrit.PublishDrafts(ctx, in.ChangeID, in.Message, in.AllRevisions); err != nil {
+		return nil, nil, fmt.Errorf("publishing drafts on %s: %w", in.ChangeID, err)
+	}
 
-// errStubbed is returned by unimplemented handlers.
-var errStubbed = errors.New("not implemented")
+	return text(render.DraftsPublished(in.ChangeID, in.AllRevisions)), nil, nil
+}
