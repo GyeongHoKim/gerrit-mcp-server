@@ -2,7 +2,6 @@ package gerrit
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"strings"
 )
@@ -63,18 +62,33 @@ func (c *Client) postMessage(ctx context.Context, changeID, suffix, message stri
 	return c.do(ctx, http.MethodPost, changePath(changeID, suffix), nil, in, nil)
 }
 
-// errStubbed is returned by unimplemented endpoints.
-var errStubbed = errors.New("not implemented")
-
 // AbandonChange stops work on a change without merging it.
 //
 // Abandoning is reversible in Gerrit's UI but not through this server, which
 // is why the tool that calls it is marked destructive.
-func (*Client) AbandonChange(_ context.Context, _, _ string) (*ChangeInfo, error) {
-	return nil, errStubbed
+func (c *Client) AbandonChange(ctx context.Context, changeID, message string) (*ChangeInfo, error) {
+	return c.postForChange(ctx, changeID, "/abandon", message)
 }
 
 // RevertChange creates a new change that undoes a merged one.
-func (*Client) RevertChange(_ context.Context, _, _ string) (*ChangeInfo, error) {
-	return nil, errStubbed
+func (c *Client) RevertChange(ctx context.Context, changeID, message string) (*ChangeInfo, error) {
+	return c.postForChange(ctx, changeID, "/revert", message)
+}
+
+// postForChange posts an action that takes an optional note and answers with
+// a ChangeInfo.
+func (c *Client) postForChange(ctx context.Context, changeID, suffix, message string) (*ChangeInfo, error) {
+	changeID = strings.TrimSpace(changeID)
+	if changeID == "" {
+		return nil, ErrEmptyChangeID
+	}
+
+	in := MessageInput{Message: strings.TrimSpace(message)}
+
+	var change ChangeInfo
+	if err := c.do(ctx, http.MethodPost, changePath(changeID, suffix), nil, in, &change); err != nil {
+		return nil, err
+	}
+
+	return &change, nil
 }

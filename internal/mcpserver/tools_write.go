@@ -2,7 +2,6 @@ package mcpserver
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -298,12 +297,17 @@ func registerAbandonChange(s *server, srv *mcp.Server) {
 }
 
 // abandonChange abandons a change.
-func (*server) abandonChange(
-	_ context.Context,
+func (s *server) abandonChange(
+	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ changeMessageInput,
+	in changeMessageInput,
 ) (*mcp.CallToolResult, any, error) {
-	return nil, nil, errStubbed
+	change, err := s.gerrit.AbandonChange(ctx, in.ChangeID, in.Message)
+	if err != nil {
+		return nil, nil, fmt.Errorf("abandoning %s: %w", in.ChangeID, err)
+	}
+
+	return text(render.ChangeAbandoned(change)), nil, nil
 }
 
 // registerRevertChange installs the revert_change tool.
@@ -319,13 +323,15 @@ func registerRevertChange(s *server, srv *mcp.Server) {
 }
 
 // revertChange creates a change that undoes another.
-func (*server) revertChange(
-	_ context.Context,
+func (s *server) revertChange(
+	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ changeMessageInput,
+	in changeMessageInput,
 ) (*mcp.CallToolResult, any, error) {
-	return nil, nil, errStubbed
-}
+	revert, err := s.gerrit.RevertChange(ctx, in.ChangeID, in.Message)
+	if err != nil {
+		return nil, nil, fmt.Errorf("reverting %s: %w", in.ChangeID, err)
+	}
 
-// errStubbed is returned by unimplemented handlers.
-var errStubbed = errors.New("not implemented")
+	return text(render.ChangeReverted(in.ChangeID, revert)), nil, nil
+}

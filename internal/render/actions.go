@@ -1,6 +1,9 @@
 package render
 
 import (
+	"strconv"
+	"strings"
+
 	"github.com/GyeongHoKim/gerrit-mcp-server/internal/gerrit"
 )
 
@@ -24,11 +27,23 @@ func WorkInProgressSet(changeID string) string {
 }
 
 // ChangeAbandoned confirms a change is no longer being worked on.
-func ChangeAbandoned(_ *gerrit.ChangeInfo) string {
-	return ""
+func ChangeAbandoned(change *gerrit.ChangeInfo) string {
+	return "Abandoned change " + strconv.Itoa(change.Number) + ": " + change.Subject + "\n"
 }
 
 // ChangeReverted names the change created to undo another.
-func ChangeReverted(_ string, _ *gerrit.ChangeInfo) string {
-	return ""
+func ChangeReverted(changeID string, revert *gerrit.ChangeInfo) string {
+	var out strings.Builder
+
+	out.WriteString("Created change ")
+	out.WriteString(strconv.Itoa(revert.Number))
+	out.WriteString(" to revert ")
+	out.WriteString(changeID)
+	out.WriteString(".\n\n")
+	writeChange(&out, revert)
+	// The revert is a proposal, not an undo: saying so stops an agent
+	// concluding the original is already gone.
+	out.WriteString("\nThe revert still has to be reviewed and submitted.\n")
+
+	return out.String()
 }
