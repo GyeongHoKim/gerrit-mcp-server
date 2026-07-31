@@ -134,6 +134,12 @@ func TestQueryChangesToolRendersMatches(t *testing.T) {
 		t.Errorf("n = %q, want %q", gotQuery.Get("n"), want)
 	}
 
+	// The stub names its owner, which a real Gerrit only does when asked. Drop
+	// the option and this test still passes while the tool reports account ids.
+	if want := "DETAILED_ACCOUNTS"; gotQuery.Get("o") != want {
+		t.Errorf("o = %q, want %q", gotQuery.Get("o"), want)
+	}
+
 	got := resultText(t, result)
 
 	for _, want := range []string{"12345", "fix the widget alignment", "NEW", "Alice Adams"} {

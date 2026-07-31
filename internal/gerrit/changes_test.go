@@ -152,6 +152,12 @@ func TestQueryChanges(t *testing.T) {
 		t.Errorf("n = %q, want %q", gotQuery.Get("n"), want)
 	}
 
+	// Without this the owner comes back as a bare account id and every change
+	// renders as a number instead of a person.
+	if want := "DETAILED_ACCOUNTS"; gotQuery.Get("o") != want {
+		t.Errorf("o = %q, want %q", gotQuery.Get("o"), want)
+	}
+
 	want := []ChangeInfo{{
 		ID:             "platform%2Fbase~main~I8473b95934b5732ac55d26311a706c9c2bde9940",
 		Project:        "platform/base",
@@ -402,10 +408,14 @@ func TestChangesSubmittedTogether(t *testing.T) {
 	  {"_number": 12346, "project": "p", "branch": "main", "subject": "second", "status": "NEW"}
 	]`
 
-	var gotPath string
+	var (
+		gotPath  string
+		gotQuery url.Values
+	)
 
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		gotPath = r.URL.EscapedPath()
+		gotQuery = r.URL.Query()
 
 		if _, err := w.Write([]byte(xssiPrefix + "\n" + body)); err != nil {
 			t.Errorf("writing test response: %v", err)
@@ -419,6 +429,12 @@ func TestChangesSubmittedTogether(t *testing.T) {
 
 	if want := "/a/changes/12345/submitted_together"; gotPath != want {
 		t.Errorf("path = %q, want %q", gotPath, want)
+	}
+
+	// These render the same block as a query result, so they need the same
+	// account detail to name an owner.
+	if want := "DETAILED_ACCOUNTS"; gotQuery.Get("o") != want {
+		t.Errorf("o = %q, want %q", gotQuery.Get("o"), want)
 	}
 
 	if len(got) != 2 {

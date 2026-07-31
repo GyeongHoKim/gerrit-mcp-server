@@ -111,6 +111,14 @@ type ChangeInfo struct {
 	MoreChanges bool `json:"_more_changes,omitempty"`
 }
 
+// detailedAccounts asks Gerrit to fill in the name, username and email on
+// every account it returns.
+//
+// Without it a query answers with bare numeric account ids, and every owner
+// renders as "1000096" instead of a person. The change detail endpoint sets
+// this itself; the query endpoints have to ask.
+const detailedAccounts = "DETAILED_ACCOUNTS"
+
 // ErrEmptyQuery reports a search with nothing to search for.
 var ErrEmptyQuery = errors.New("query must not be empty")
 
@@ -124,7 +132,7 @@ func (c *Client) QueryChanges(ctx context.Context, query string, limit int) ([]C
 		return nil, ErrEmptyQuery
 	}
 
-	values := url.Values{"q": {query}}
+	values := url.Values{"q": {query}, "o": {detailedAccounts}}
 	if limit > 0 {
 		values.Set("n", strconv.Itoa(limit))
 	}
@@ -239,8 +247,10 @@ func (c *Client) ChangesSubmittedTogether(ctx context.Context, changeID string) 
 		return nil, ErrEmptyChangeID
 	}
 
+	values := url.Values{"o": {detailedAccounts}}
+
 	var changes []ChangeInfo
-	if err := c.do(ctx, http.MethodGet, changePath(changeID, "/submitted_together"), nil, nil, &changes); err != nil {
+	if err := c.do(ctx, http.MethodGet, changePath(changeID, "/submitted_together"), values, nil, &changes); err != nil {
 		return nil, err
 	}
 
