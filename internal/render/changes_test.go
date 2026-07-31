@@ -4,6 +4,7 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -34,13 +35,20 @@ func golden(t *testing.T, name, got string) {
 		return
 	}
 
-	want, err := os.ReadFile(path) //nolint:gosec // the path is built from a test-supplied name
+	raw, err := os.ReadFile(path) //nolint:gosec // the path is built from a test-supplied name
 	if err != nil {
 		t.Fatalf("reading %s (run with -update to create it): %v", path, err)
 	}
 
-	if got != string(want) {
-		t.Errorf("output mismatch for %s\n--- got ---\n%s\n--- want ---\n%s", name, got, want)
+	// .gitattributes pins these files to LF, but a checkout predating it -- or
+	// one made with core.autocrlf=true and no attributes in play -- hands us
+	// CRLF. render only ever emits LF, so the difference is never meaningful.
+	want := strings.ReplaceAll(string(raw), "\r\n", "\n")
+
+	if got != want {
+		// %q, because a line ending is the one difference that a plain diff
+		// prints as two identical blocks.
+		t.Errorf("output mismatch for %s\n--- got ---\n%q\n--- want ---\n%q", name, got, want)
 	}
 }
 
