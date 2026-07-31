@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 )
 
@@ -216,15 +218,32 @@ func (c *Client) DeleteDraftComment(ctx context.Context, changeID, draftID strin
 	return c.do(ctx, http.MethodDelete, path, nil, nil, nil)
 }
 
-// errStubbed is returned by unimplemented endpoints.
-var errStubbed = errors.New("not implemented")
-
 // DeleteAllDraftComments discards every draft the calling account has staged
 // on a change, and reports how many it removed.
 //
 // Gerrit has no bulk delete, so this lists the drafts and removes them one at
 // a time. A failure part way through leaves the earlier deletions in place --
 // they are already gone -- and reports what happened.
-func (*Client) DeleteAllDraftComments(_ context.Context, _ string) (int, error) {
-	return 0, errStubbed
+func (c *Client) DeleteAllDraftComments(ctx context.Context, changeID string) (int, error) {
+	byFile, err := c.ListDraftComments(ctx, changeID)
+	if err != nil {
+		return 0, err
+	}
+
+	deleted := 0
+
+	// Sorted so a partial failure is reproducible rather than depending on
+	// which file Go's map iteration happened to reach first.
+	for _, file := range slices.Sorted(maps.Keys(byFile)) {
+		drafts := byFile[file]
+		for i := range drafts {
+			if deleteErr := c.DeleteDraftComment(ctx, changeID, drafts[i].ID); deleteErr != nil {
+				return deleted, fmt.Errorf("discarding draft %s on %s: %w", drafts[i].ID, file, deleteErr)
+			}
+
+			deleted++
+		}
+	}
+
+	return deleted, nil
 }

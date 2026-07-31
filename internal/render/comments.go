@@ -205,6 +205,15 @@ func DraftDeleted(changeID, draftID string) string {
 }
 
 // DraftsDeleted confirms how many staged comments were discarded.
-func DraftsDeleted(_ string, _ int) string {
-	return ""
+func DraftsDeleted(changeID string, count int) string {
+	if count == 0 {
+		return "No draft comments were staged on change " + changeID + ".\n"
+	}
+
+	noun := " draft comments"
+	if count == 1 {
+		noun = " draft comment"
+	}
+
+	return "Discarded " + strconv.Itoa(count) + noun + " on change " + changeID + ".\n"
 }
