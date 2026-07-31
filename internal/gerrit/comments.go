@@ -2,11 +2,9 @@ package gerrit
 
 import (
 	"context"
-	"errors"
+	"net/http"
+	"strings"
 )
-
-// errStubbed is returned by unimplemented endpoints.
-var errStubbed = errors.New("not implemented")
 
 // CommentRange is a character range within a file.
 type CommentRange struct {
@@ -48,12 +46,27 @@ type CommentInfo struct {
 
 // ListComments retrieves the published comments on a change, keyed by file
 // path.
-func (*Client) ListComments(_ context.Context, _ string) (map[string][]CommentInfo, error) {
-	return nil, errStubbed
+func (c *Client) ListComments(ctx context.Context, changeID string) (map[string][]CommentInfo, error) {
+	return c.comments(ctx, changeID, "/comments")
 }
 
 // ListDraftComments retrieves the calling account's unpublished draft
 // comments on a change, keyed by file path.
-func (*Client) ListDraftComments(_ context.Context, _ string) (map[string][]CommentInfo, error) {
-	return nil, errStubbed
+func (c *Client) ListDraftComments(ctx context.Context, changeID string) (map[string][]CommentInfo, error) {
+	return c.comments(ctx, changeID, "/drafts")
+}
+
+// comments fetches a comment collection keyed by file path.
+func (c *Client) comments(ctx context.Context, changeID, suffix string) (map[string][]CommentInfo, error) {
+	changeID = strings.TrimSpace(changeID)
+	if changeID == "" {
+		return nil, ErrEmptyChangeID
+	}
+
+	byFile := map[string][]CommentInfo{}
+	if err := c.do(ctx, http.MethodGet, changePath(changeID, suffix), nil, nil, &byFile); err != nil {
+		return nil, err
+	}
+
+	return byFile, nil
 }
