@@ -310,3 +310,48 @@ func TestListChangeFilesTool(t *testing.T) {
 		t.Errorf("output leaks raw Gerrit JSON:\n%s", got)
 	}
 }
+
+func TestGetFileDiffTool(t *testing.T) {
+	t.Parallel()
+
+	const body = `{
+	  "change_type": "MODIFIED",
+	  "meta_a": {"name": "src/widget.go", "lines": 2},
+	  "meta_b": {"name": "src/widget.go", "lines": 3},
+	  "content": [
+	    {"ab": ["package widget"]},
+	    {"a": ["func old() {}"], "b": ["func new() {}"]}
+	  ]
+	}`
+
+	var gotPath string
+
+	srv := newServerAgainst(t, func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.EscapedPath()
+
+		if _, err := w.Write([]byte(")]}'\n" + body)); err != nil {
+			t.Errorf("writing stub response: %v", err)
+		}
+	})
+
+	result := callTool(t, srv, "get_file_diff", map[string]any{
+		"change_id": "12345",
+		"file":      "src/widget.go",
+	})
+
+	if result.IsError {
+		t.Fatalf("get_file_diff reported an error: %s", resultText(t, result))
+	}
+
+	if want := "/a/changes/12345/revisions/current/files/src%2Fwidget.go/diff"; gotPath != want {
+		t.Errorf("path = %q, want %q", gotPath, want)
+	}
+
+	got := resultText(t, result)
+
+	for _, want := range []string{"src/widget.go", "- func old() {}", "+ func new() {}"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("output does not mention %q:\n%s", want, got)
+		}
+	}
+}

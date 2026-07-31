@@ -1,0 +1,9 @@
+src/widget.go (MODIFIED)
+
+  package widget
+  
+- func old() {}
++ func new() {}
++ func extra() {}
+@@ 40 lines skipped @@
++ // trailing addition

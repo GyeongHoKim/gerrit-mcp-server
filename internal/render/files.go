@@ -69,3 +69,8 @@ func writeFile(out *strings.Builder, path string, file gerrit.FileInfo) {
 
 	out.WriteString("\n")
 }
+
+// Diff renders a file diff in unified form.
+func Diff(_ string, _ *gerrit.DiffInfo) string {
+	return ""
+}

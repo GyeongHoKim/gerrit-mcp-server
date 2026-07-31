@@ -54,3 +54,54 @@ func (c *Client) ListFiles(ctx context.Context, changeID string) (map[string]Fil
 
 	return files, nil
 }
+
+// errStubbed is returned by unimplemented endpoints.
+var errStubbed = errors.New("not implemented")
+
+// DiffFileMeta describes one side of a diff.
+type DiffFileMeta struct {
+	// Name is the file path on this side.
+	Name string `json:"name"`
+	// ContentType is the detected MIME type.
+	ContentType string `json:"content_type"`
+	// Lines is the number of lines on this side.
+	Lines int `json:"lines"`
+}
+
+// DiffContent is one region of a diff.
+//
+// Exactly one shape is populated per region: AB for context, A and B for a
+// replacement, or Skip for a stretch Gerrit chose not to send.
+type DiffContent struct {
+	// A holds lines present only on the old side.
+	A []string `json:"a,omitempty"`
+	// B holds lines present only on the new side.
+	B []string `json:"b,omitempty"`
+	// AB holds lines common to both sides.
+	AB []string `json:"ab,omitempty"`
+	// Skip counts lines omitted from both sides.
+	Skip int `json:"skip,omitempty"`
+	// Common reports a region that is identical on both sides.
+	Common bool `json:"common,omitempty"`
+}
+
+// DiffInfo is the diff of one file in a patch set.
+type DiffInfo struct {
+	// MetaA describes the old side, absent when the file was added.
+	MetaA *DiffFileMeta `json:"meta_a,omitempty"`
+	// MetaB describes the new side, absent when the file was deleted.
+	MetaB *DiffFileMeta `json:"meta_b,omitempty"`
+	// ChangeType is ADDED, MODIFIED, DELETED, RENAMED, COPIED or REWRITE.
+	ChangeType string `json:"change_type"`
+	// DiffHeader is the raw patch header Gerrit produced.
+	DiffHeader []string `json:"diff_header,omitempty"`
+	// Content is the diff itself, in order.
+	Content []DiffContent `json:"content"`
+	// Binary reports a file Gerrit will not diff as text.
+	Binary bool `json:"binary,omitempty"`
+}
+
+// GetFileDiff retrieves the diff of one file in a change's current patch set.
+func (*Client) GetFileDiff(_ context.Context, _, _ string) (*DiffInfo, error) {
+	return nil, errStubbed
+}

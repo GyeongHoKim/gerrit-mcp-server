@@ -28,6 +28,7 @@ var readTools = []toolRegistrar{
 	registerGetChangeDetails,
 	registerGetCommitMessage,
 	registerListChangeFiles,
+	registerGetFileDiff,
 }
 
 // writeTools modify Gerrit and are registered only when writes are allowed.

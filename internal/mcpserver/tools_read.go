@@ -2,6 +2,7 @@ package mcpserver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -116,3 +117,32 @@ func (s *server) listChangeFiles(
 
 	return text(render.Files(files)), nil, nil
 }
+
+// fileDiffInput is the argument schema for the get_file_diff tool.
+type fileDiffInput struct {
+	// ChangeID identifies the change.
+	ChangeID string `json:"change_id" jsonschema:"the change number (12345) or the triplet project~branch~Change-Id"`
+	// File is the path within the change.
+	File string `json:"file" jsonschema:"path of the file within the change, as returned by list_change_files"`
+}
+
+// registerGetFileDiff installs the get_file_diff tool.
+func registerGetFileDiff(s *server, srv *mcp.Server) {
+	mcp.AddTool(srv, &mcp.Tool{
+		Name:        "get_file_diff",
+		Description: "Retrieve the diff of a single file in a Gerrit change's current patch set.",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, s.getFileDiff)
+}
+
+// getFileDiff retrieves and renders one file's diff.
+func (*server) getFileDiff(
+	_ context.Context,
+	_ *mcp.CallToolRequest,
+	_ fileDiffInput,
+) (*mcp.CallToolResult, any, error) {
+	return nil, nil, errStubbed
+}
+
+// errStubbed is returned by unimplemented handlers.
+var errStubbed = errors.New("not implemented")
