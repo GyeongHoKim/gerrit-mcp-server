@@ -358,3 +358,38 @@ func TestSetTopicTool(t *testing.T) {
 		})
 	}
 }
+
+func TestReadyAndWorkInProgressTools(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		tool     string
+		wantPath string
+	}{
+		"ready":            {tool: "set_ready_for_review", wantPath: "/a/changes/12345/ready"},
+		"work in progress": {tool: "set_work_in_progress", wantPath: "/a/changes/12345/wip"},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			var gotPath string
+
+			srv := newWritableServerAgainst(t, func(w http.ResponseWriter, r *http.Request) {
+				gotPath = r.URL.EscapedPath()
+				w.WriteHeader(http.StatusOK)
+			})
+
+			result := callTool(t, srv, test.tool, map[string]any{"change_id": "12345"})
+
+			if result.IsError {
+				t.Fatalf("%s reported an error: %s", test.tool, resultText(t, result))
+			}
+
+			if gotPath != test.wantPath {
+				t.Errorf("path = %q, want %q", gotPath, test.wantPath)
+			}
+		})
+	}
+}

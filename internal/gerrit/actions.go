@@ -2,6 +2,7 @@ package gerrit
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 )
@@ -30,4 +31,24 @@ func (c *Client) SetTopic(ctx context.Context, changeID, topic string) error {
 	}
 
 	return c.do(ctx, http.MethodPut, path, nil, TopicInput{Topic: topic}, nil)
+}
+
+// errStubbed is returned by unimplemented endpoints.
+var errStubbed = errors.New("not implemented")
+
+// MessageInput carries the optional note Gerrit attaches to a state change.
+type MessageInput struct {
+	// Message is posted on the change alongside the action.
+	Message string `json:"message,omitempty"`
+}
+
+// SetReadyForReview takes a change out of work-in-progress and notifies its
+// reviewers.
+func (*Client) SetReadyForReview(_ context.Context, _, _ string) error {
+	return errStubbed
+}
+
+// SetWorkInProgress marks a change as not yet asking for review.
+func (*Client) SetWorkInProgress(_ context.Context, _, _ string) error {
+	return errStubbed
 }

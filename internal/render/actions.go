@@ -8,3 +8,13 @@ func TopicSet(changeID, topic string) string {
 
 	return "Set the topic on change " + changeID + " to " + topic + ".\n"
 }
+
+// ReadyForReviewSet confirms a change is asking for review.
+func ReadyForReviewSet(_ string) string {
+	return ""
+}
+
+// WorkInProgressSet confirms a change is no longer asking for review.
+func WorkInProgressSet(_ string) string {
+	return ""
+}

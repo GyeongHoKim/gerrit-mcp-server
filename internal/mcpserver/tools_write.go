@@ -2,6 +2,7 @@ package mcpserver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -228,3 +229,53 @@ func (s *server) setTopic(
 
 	return text(render.TopicSet(in.ChangeID, topic)), nil, nil
 }
+
+// changeMessageInput is the argument schema for the tools that flip a change's
+// state with an optional note.
+type changeMessageInput struct {
+	// ChangeID identifies the change.
+	ChangeID string `json:"change_id" jsonschema:"the change number (12345) or the triplet project~branch~Change-Id"`
+	// Message is posted on the change alongside the action.
+	Message string `json:"message,omitempty" jsonschema:"optional note posted on the change explaining the action"`
+}
+
+// registerSetReadyForReview installs the set_ready_for_review tool.
+func registerSetReadyForReview(s *server, srv *mcp.Server) {
+	mcp.AddTool(srv, &mcp.Tool{
+		Name: "set_ready_for_review",
+		Description: "Take a Gerrit change out of work-in-progress, which notifies its reviewers " +
+			"that it is ready to look at.",
+		Annotations: &mcp.ToolAnnotations{IdempotentHint: true},
+	}, s.setReadyForReview)
+}
+
+// setReadyForReview marks a change ready.
+func (*server) setReadyForReview(
+	_ context.Context,
+	_ *mcp.CallToolRequest,
+	_ changeMessageInput,
+) (*mcp.CallToolResult, any, error) {
+	return nil, nil, errStubbed
+}
+
+// registerSetWorkInProgress installs the set_work_in_progress tool.
+func registerSetWorkInProgress(s *server, srv *mcp.Server) {
+	mcp.AddTool(srv, &mcp.Tool{
+		Name: "set_work_in_progress",
+		Description: "Mark a Gerrit change as work-in-progress, so it stops asking its reviewers " +
+			"for attention.",
+		Annotations: &mcp.ToolAnnotations{IdempotentHint: true},
+	}, s.setWorkInProgress)
+}
+
+// setWorkInProgress marks a change work-in-progress.
+func (*server) setWorkInProgress(
+	_ context.Context,
+	_ *mcp.CallToolRequest,
+	_ changeMessageInput,
+) (*mcp.CallToolResult, any, error) {
+	return nil, nil, errStubbed
+}
+
+// errStubbed is returned by unimplemented handlers.
+var errStubbed = errors.New("not implemented")
