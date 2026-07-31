@@ -93,16 +93,51 @@ func Diff(path string, diff *gerrit.DiffInfo) string {
 		return out.String()
 	}
 
+	// The legend costs one line and saves the model from guessing which side
+	// a number refers to.
+	legend := "Line numbers: '-' rows are the old file, others the new.\n\n"
+	out.WriteString(legend)
+
 	if writeDiffBody(&out, diff.Content) == 0 {
+		// Nothing was written, so the legend describes nothing.
+		body := out.String()
+		out.Reset()
+		out.WriteString(strings.TrimSuffix(body, legend))
 		out.WriteString("No textual changes.\n")
 	}
 
 	return out.String()
 }
 
+// diffSide says which file a run of lines belongs to.
+type diffSide int
+
+const (
+	// bothSides is context, present in the old file and the new one.
+	bothSides diffSide = iota
+	// oldSide is a removed line, numbered against the old file.
+	oldSide
+	// newSide is an added line, numbered against the new file.
+	newSide
+)
+
+// diffGroup is one run of lines sharing a marker and a side.
+type diffGroup struct {
+	marker string
+	lines  []string
+	side   diffSide
+}
+
+// diffCursor tracks the current line on each side of the diff.
+type diffCursor struct {
+	old     int
+	next    int
+	written int
+}
+
 // writeDiffBody appends the diff regions and reports how many lines it wrote.
 func writeDiffBody(out *strings.Builder, content []gerrit.DiffContent) int {
-	written := 0
+	cursor := diffCursor{old: 1, next: 1}
 
 	for i := range content {
 		region := &content[i]
@@ -112,34 +147,75 @@ func writeDiffBody(out *strings.Builder, content []gerrit.DiffContent) int {
 			out.WriteString(strconv.Itoa(region.Skip))
 			out.WriteString(" lines skipped @@\n")
 
-			written++
+			// A skip elides the same run from both sides at once. Advancing
+			// only one would shift every number after it.
+			cursor.old += region.Skip
+			cursor.next += region.Skip
+			cursor.written++
 		}
 
-		for _, group := range []struct {
-			marker string
-			lines  []string
-		}{
-			{marker: "- ", lines: region.A},
-			{marker: "+ ", lines: region.B},
-			{marker: "  ", lines: region.AB},
-		} {
-			for _, line := range group.lines {
-				if written >= MaxDiffLines {
-					out.WriteString("... diff truncated after ")
-					out.WriteString(strconv.Itoa(MaxDiffLines))
-					out.WriteString(" lines ...\n")
+		groups := []diffGroup{
+			{lines: region.A, marker: "- ", side: oldSide},
+			{lines: region.B, marker: "+ ", side: newSide},
+			{lines: region.AB, marker: "  ", side: bothSides},
+		}
 
-					return written
-				}
-
-				out.WriteString(group.marker)
-				out.WriteString(line)
-				out.WriteString("\n")
-
-				written++
+		for _, group := range groups {
+			if writeDiffGroup(out, &cursor, group) {
+				return cursor.written
 			}
 		}
 	}
 
-	return written
+	return cursor.written
+}
+
+// writeDiffGroup appends one run of lines, reporting whether the cap was hit.
+func writeDiffGroup(out *strings.Builder, cursor *diffCursor, group diffGroup) bool {
+	for _, line := range group.lines {
+		if cursor.written >= MaxDiffLines {
+			out.WriteString("... diff truncated after ")
+			out.WriteString(strconv.Itoa(MaxDiffLines))
+			out.WriteString(" lines ...\n")
+
+			return true
+		}
+
+		number := cursor.next
+		if group.side == oldSide {
+			number = cursor.old
+		}
+
+		writeNumberedLine(out, number, group.marker, line)
+
+		switch group.side {
+		case oldSide:
+			cursor.old++
+		case newSide:
+			cursor.next++
+		default:
+			cursor.old++
+			cursor.next++
+		}
+
+		cursor.written++
+	}
+
+	return false
+}
+
+// writeNumberedLine appends one diff row in a fixed-width numbered column.
+func writeNumberedLine(out *strings.Builder, number int, marker, line string) {
+	const numberWidth = 4
+
+	text := strconv.Itoa(number)
+	if pad := numberWidth - len(text); pad > 0 {
+		out.WriteString(strings.Repeat(" ", pad))
+	}
+
+	out.WriteString(text)
+	out.WriteString(" ")
+	out.WriteString(marker)
+	out.WriteString(line)
+	out.WriteString("\n")
 }
