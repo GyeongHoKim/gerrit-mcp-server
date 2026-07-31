@@ -141,6 +141,27 @@ func CommitMessage(message *gerrit.CommitMessageInfo) string {
 }
 
 // Bugs renders the issue references extracted from a commit message.
-func Bugs(_ []string) string {
-	return ""
+func Bugs(bugs []string) string {
+	if len(bugs) == 0 {
+		return "No issue references in the commit message.\n"
+	}
+
+	var out strings.Builder
+
+	out.WriteString(strconv.Itoa(len(bugs)))
+	out.WriteString(" issue reference")
+
+	if len(bugs) != 1 {
+		out.WriteString("s")
+	}
+
+	out.WriteString(".\n\n")
+
+	for _, bug := range bugs {
+		out.WriteString("  ")
+		out.WriteString(bug)
+		out.WriteString("\n")
+	}
+
+	return out.String()
 }

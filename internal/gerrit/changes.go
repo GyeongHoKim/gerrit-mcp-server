@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 )
 
 // timestampLayout is Gerrit's timestamp format. It is deliberately not RFC
@@ -250,14 +251,32 @@ func (c *Client) ChangesSubmittedTogether(ctx context.Context, changeID string) 
 //
 // Gerrit itself does not define these; they are the conventions in wide use
 // across projects that host on Gerrit.
-//
-//nolint:unused // the implementation commit walks it
 var bugFooters = []string{"Bug", "Closes", "Fixes", "Issue", "Partial-Bug", "Related-Bug"}
 
 // Bugs returns the issue references in the commit message, in the order the
 // footers are listed above and deduplicated.
 //
 // A footer may carry several ids, comma or space separated.
-func (*CommitMessageInfo) Bugs() []string {
-	return nil
+func (m *CommitMessageInfo) Bugs() []string {
+	var (
+		bugs []string
+		seen = map[string]bool{}
+	)
+
+	for _, footer := range bugFooters {
+		for _, id := range strings.FieldsFunc(m.Footers[footer], isFooterSeparator) {
+			if id = strings.TrimSpace(id); id != "" && !seen[id] {
+				seen[id] = true
+				bugs = append(bugs, id)
+			}
+		}
+	}
+
+	return bugs
+}
+
+// isFooterSeparator reports the characters that divide several ids inside one
+// footer value.
+func isFooterSeparator(r rune) bool {
+	return r == ',' || r == ';' || unicode.IsSpace(r)
 }
