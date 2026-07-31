@@ -2,6 +2,7 @@ package mcpserver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -249,3 +250,24 @@ func (s *server) suggestReviewers(
 
 	return text(render.Reviewers(suggestions)), nil, nil
 }
+
+// registerGetBugsFromCL installs the get_bugs_from_cl tool.
+func registerGetBugsFromCL(s *server, srv *mcp.Server) {
+	mcp.AddTool(srv, &mcp.Tool{
+		Name:        "get_bugs_from_cl",
+		Description: "Extract the issue or bug references from a Gerrit change's commit message footers.",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, s.getBugsFromCL)
+}
+
+// getBugsFromCL extracts issue references from a change's commit message.
+func (*server) getBugsFromCL(
+	_ context.Context,
+	_ *mcp.CallToolRequest,
+	_ changeIDInput,
+) (*mcp.CallToolResult, any, error) {
+	return nil, nil, errStubbed
+}
+
+// errStubbed is returned by unimplemented handlers.
+var errStubbed = errors.New("not implemented")

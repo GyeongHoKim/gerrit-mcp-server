@@ -138,3 +138,35 @@ func TestCommitMessage(t *testing.T) {
 		})
 	}
 }
+
+func TestBugs(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		want string
+		bugs []string
+	}{
+		"none": {
+			bugs: nil,
+			want: "No issue references in the commit message.\n",
+		},
+		"one": {
+			bugs: []string{"123"},
+			want: "1 issue reference.\n\n  123\n",
+		},
+		"several": {
+			bugs: []string{"123", "b/456"},
+			want: "2 issue references.\n\n  123\n  b/456\n",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := render.Bugs(test.bugs); got != test.want {
+				t.Errorf("Bugs() = %q, want %q", got, test.want)
+			}
+		})
+	}
+}

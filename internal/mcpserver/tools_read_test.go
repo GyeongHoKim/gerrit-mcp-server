@@ -508,3 +508,48 @@ func TestSuggestReviewersTool(t *testing.T) {
 		}
 	}
 }
+
+func TestGetBugsFromCLTool(t *testing.T) {
+	t.Parallel()
+
+	const body = `{
+	  "subject": "Add feature X",
+	  "full_message": "Add feature X\n\nBug: 123\nFixes: 456\nChange-Id: I1\n",
+	  "footers": {"Bug": "123", "Fixes": "456", "Change-Id": "I1"}
+	}`
+
+	var gotPath string
+
+	srv := newServerAgainst(t, func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.EscapedPath()
+
+		if _, err := w.Write([]byte(")]}'\n" + body)); err != nil {
+			t.Errorf("writing stub response: %v", err)
+		}
+	})
+
+	result := callTool(t, srv, "get_bugs_from_cl", map[string]any{"change_id": "12345"})
+
+	if result.IsError {
+		t.Fatalf("get_bugs_from_cl reported an error: %s", resultText(t, result))
+	}
+
+	// Gerrit parses the footers for us, so this rides on /message rather than
+	// re-parsing the prose.
+	if want := "/a/changes/12345/message"; gotPath != want {
+		t.Errorf("path = %q, want %q", gotPath, want)
+	}
+
+	got := resultText(t, result)
+
+	for _, want := range []string{"123", "456"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("output does not mention %q:\n%s", want, got)
+		}
+	}
+
+	// Change-Id is a footer too, and it is not an issue reference.
+	if strings.Contains(got, "I1") {
+		t.Errorf("output treats the Change-Id as a bug:\n%s", got)
+	}
+}

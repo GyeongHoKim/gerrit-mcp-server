@@ -245,3 +245,19 @@ func (c *Client) ChangesSubmittedTogether(ctx context.Context, changeID string) 
 
 	return changes, nil
 }
+
+// bugFooters are the commit message footers that carry an issue reference.
+//
+// Gerrit itself does not define these; they are the conventions in wide use
+// across projects that host on Gerrit.
+//
+//nolint:unused // the implementation commit walks it
+var bugFooters = []string{"Bug", "Closes", "Fixes", "Issue", "Partial-Bug", "Related-Bug"}
+
+// Bugs returns the issue references in the commit message, in the order the
+// footers are listed above and deduplicated.
+//
+// A footer may carry several ids, comma or space separated.
+func (*CommitMessageInfo) Bugs() []string {
+	return nil
+}

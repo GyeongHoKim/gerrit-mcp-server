@@ -139,3 +139,8 @@ func CommitMessage(message *gerrit.CommitMessageInfo) string {
 
 	return body
 }
+
+// Bugs renders the issue references extracted from a commit message.
+func Bugs(_ []string) string {
+	return ""
+}

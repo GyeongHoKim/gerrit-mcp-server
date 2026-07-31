@@ -446,3 +446,60 @@ func TestChangesSubmittedTogetherAloneIsEmptyNotAnError(t *testing.T) {
 		t.Errorf("len(changes) = %d, want 0", len(got))
 	}
 }
+
+func TestCommitMessageBugs(t *testing.T) {
+	t.Parallel()
+
+	const footerBug = "Bug"
+
+	tests := map[string]struct {
+		footers map[string]string
+		want    []string
+	}{
+		"no footers at all": {
+			footers: nil,
+			want:    nil,
+		},
+		"only a change id": {
+			footers: map[string]string{"Change-Id": "I1039447"},
+			want:    nil,
+		},
+		"a single bug": {
+			footers: map[string]string{footerBug: "123", "Change-Id": "I1"},
+			want:    []string{"123"},
+		},
+		"several ids in one footer": {
+			footers: map[string]string{footerBug: "123, 456"},
+			want:    []string{"123", "456"},
+		},
+		"space separated ids": {
+			footers: map[string]string{footerBug: "b/123 b/456"},
+			want:    []string{"b/123", "b/456"},
+		},
+		"several footer kinds": {
+			footers: map[string]string{footerBug: "123", "Fixes": "456", "Closes": "789"},
+			want:    []string{"123", "789", "456"},
+		},
+		// The same id under two footers is one issue, not two.
+		"duplicates collapse": {
+			footers: map[string]string{footerBug: "123", "Related-Bug": "123"},
+			want:    []string{"123"},
+		},
+		"empty footer value": {
+			footers: map[string]string{footerBug: "   "},
+			want:    nil,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			message := &CommitMessageInfo{Footers: test.footers}
+
+			if diff := cmp.Diff(test.want, message.Bugs()); diff != "" {
+				t.Errorf("Bugs() mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
