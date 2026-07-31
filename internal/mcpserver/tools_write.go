@@ -2,6 +2,7 @@ package mcpserver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -195,3 +196,32 @@ func (s *server) addReviewer(
 
 	return text(render.ReviewerAdded(in.ChangeID, result)), nil, nil
 }
+
+// setTopicInput is the argument schema for the set_topic tool.
+type setTopicInput struct {
+	// ChangeID identifies the change.
+	ChangeID string `json:"change_id" jsonschema:"the change number (12345) or the triplet project~branch~Change-Id"`
+	// Topic is the new topic.
+	Topic string `json:"topic" jsonschema:"the new topic; pass an empty string to clear it"`
+}
+
+// registerSetTopic installs the set_topic tool.
+func registerSetTopic(s *server, srv *mcp.Server) {
+	mcp.AddTool(srv, &mcp.Tool{
+		Name:        "set_topic",
+		Description: "Set the topic of a Gerrit change, or clear it by passing an empty topic.",
+		Annotations: &mcp.ToolAnnotations{IdempotentHint: true},
+	}, s.setTopic)
+}
+
+// setTopic sets or clears a change's topic.
+func (*server) setTopic(
+	_ context.Context,
+	_ *mcp.CallToolRequest,
+	_ setTopicInput,
+) (*mcp.CallToolResult, any, error) {
+	return nil, nil, errStubbed
+}
+
+// errStubbed is returned by unimplemented handlers.
+var errStubbed = errors.New("not implemented")

@@ -317,3 +317,44 @@ func TestAddReviewerTool(t *testing.T) {
 		t.Errorf("output = %q, want it to name who was added", got)
 	}
 }
+
+func TestSetTopicTool(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		topic      string
+		wantMethod string
+	}{
+		"setting a topic puts it":  {topic: "cleanup", wantMethod: http.MethodPut},
+		"clearing a topic deletes": {topic: "", wantMethod: http.MethodDelete},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			var gotMethod string
+
+			srv := newWritableServerAgainst(t, func(w http.ResponseWriter, r *http.Request) {
+				gotMethod = r.Method
+
+				if _, err := w.Write([]byte(")]}'\n\"cleanup\"")); err != nil {
+					t.Errorf("writing stub response: %v", err)
+				}
+			})
+
+			result := callTool(t, srv, "set_topic", map[string]any{
+				"change_id": "12345",
+				"topic":     test.topic,
+			})
+
+			if result.IsError {
+				t.Fatalf("set_topic reported an error: %s", resultText(t, result))
+			}
+
+			if gotMethod != test.wantMethod {
+				t.Errorf("method = %s, want %s", gotMethod, test.wantMethod)
+			}
+		})
+	}
+}

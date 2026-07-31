@@ -43,6 +43,7 @@ var writeTools = []toolRegistrar{
 	registerDeleteDraftComment,
 	registerDeleteDraftComments,
 	registerAddReviewer,
+	registerSetTopic,
 }
 
 // server carries what the tool handlers need.
