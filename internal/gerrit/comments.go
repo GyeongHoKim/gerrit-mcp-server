@@ -2,6 +2,7 @@ package gerrit
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 )
@@ -69,4 +70,38 @@ func (c *Client) comments(ctx context.Context, changeID, suffix string) (map[str
 	}
 
 	return byFile, nil
+}
+
+// errStubbed is returned by unimplemented endpoints.
+var errStubbed = errors.New("not implemented")
+
+// ErrEmptyMessage reports a comment with nothing to say.
+var ErrEmptyMessage = errors.New("comment message must not be empty")
+
+// CommentInput creates a draft comment.
+type CommentInput struct {
+	// Range highlights a region rather than a single line.
+	Range *CommentRange `json:"range,omitempty"`
+	// Path is the file the comment belongs to.
+	Path string `json:"path,omitempty"`
+	// Side is REVISION or PARENT. Empty means REVISION.
+	Side string `json:"side,omitempty"`
+	// Message is the comment text.
+	Message string `json:"message"`
+	// InReplyTo is the id of the comment being answered.
+	InReplyTo string `json:"in_reply_to,omitempty"`
+	// Line is the line to attach to. Zero makes it a file-level comment.
+	Line int `json:"line,omitempty"`
+	// Unresolved marks the comment as needing an answer. Sent even when false
+	// so the intent is explicit rather than inherited from a Gerrit default.
+	Unresolved bool `json:"unresolved"`
+}
+
+// CreateDraftComment stages an unpublished comment on a change's current
+// patch set.
+//
+// Drafts are deliberate: nothing reaches the change's reviewers until
+// publish_drafts is called.
+func (*Client) CreateDraftComment(_ context.Context, _ string, _ *CommentInput) (*CommentInfo, error) {
+	return nil, errStubbed
 }

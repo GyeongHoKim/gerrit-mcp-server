@@ -37,7 +37,9 @@ var readTools = []toolRegistrar{
 }
 
 // writeTools modify Gerrit and are registered only when writes are allowed.
-var writeTools []toolRegistrar
+var writeTools = []toolRegistrar{
+	registerPostReviewComment,
+}
 
 // server carries what the tool handlers need.
 type server struct {

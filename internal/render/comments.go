@@ -160,3 +160,8 @@ func commentLocation(comment *gerrit.CommentInfo) string {
 
 	return location
 }
+
+// DraftCreated confirms a staged comment.
+func DraftCreated(_ *gerrit.CommentInfo) string {
+	return ""
+}
