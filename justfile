@@ -147,9 +147,13 @@ clean:
     rm -rf bin dist coverage.out coverage.html
 
 # Remove build output. (windows)
+#
+# -ErrorAction SilentlyContinue hides the error but still leaves $? false, and
+# powershell.exe -Command turns that into exit 1 -- so a clean checkout, where
+# none of these exist yet, fails the recipe. Only delete what is actually there.
 [windows]
 clean:
-    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue bin, dist, coverage.out, coverage.html
+    foreach ($p in "bin", "dist", "coverage.out", "coverage.html") { if (Test-Path $p) { Remove-Item -Recurse -Force $p } }
 
 # ---------------------------------------------------------------- aggregate
 

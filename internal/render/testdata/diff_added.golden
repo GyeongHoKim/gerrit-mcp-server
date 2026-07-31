@@ -1,0 +1,6 @@
+src/widget.go (ADDED)
+
+Line numbers: '-' rows are the old file, others the new.
+
+   1 + package new
+   2 + 

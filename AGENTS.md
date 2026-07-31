@@ -48,6 +48,7 @@ Always go through `just`. The recipes carry the right flags and CI runs the same
 cmd/gerrit-mcp-server/   entry point: flags, environment, wiring
 internal/config/         environment parsing and validation
 internal/gerrit/         the REST client -- HTTP lives here and nowhere else
+internal/render/         Gerrit types to the compact text the model reads
 internal/mcpserver/      tool definitions and registration
 internal/version/        ldflags-injected build stamps
 npm/                     published wrapper package (bin/cli.js dispatches by platform)
@@ -65,10 +66,11 @@ if you find yourself reaching for a helper library, write the twenty lines inste
 dependency graph is a feature of a binary that companies install internally.
 
 **Wrap every error with context**: `fmt.Errorf("fetching change %s: %w", id, err)`. Sentinel errors
-belong in `internal/gerrit/errors.go` so callers can use `errors.Is`.
+are declared in the file whose endpoints return them -- transport statuses in `client.go`,
+argument validation next to the call it guards -- so callers can use `errors.Is`.
 
 **Never return raw Gerrit JSON to the model.** A `ChangeInfo` is enormous and most of it is noise.
-Everything the model sees goes through `internal/mcpserver/render.go`, which compacts it. Tokens
+Everything the model sees goes through `internal/render`, which compacts it. Tokens
 are a budget.
 
 **Write tools are opt-in.** Anything that mutates Gerrit is registered only when
@@ -83,8 +85,11 @@ reference is the AsciiDoc in `doc/` — run `just fetch-gerrit-docs` to get it.
   authenticated. Auth itself is HTTP Basic with an account token.
 - **Every JSON response starts with `)]}'`.** Gerrit prepends this line to defeat XSSI. Strip those
   four bytes before parsing or `json.Unmarshal` fails on every single call.
-- **Change ids need escaping.** The triplet form is `project~branch~Ihash`, and `project` routinely
-  contains `/`. URL-encode it.
+- **Change ids come in two forms, and one is pre-encoded.** `ChangeInfo.id` is
+  `project~<number>` with `project` *already* URL encoded; `triplet_id` is
+  `project~branch~Change-Id`. Project names routinely contain `/`, so an id must reach Gerrit as one
+  escaped path segment — but escaping an id Gerrit handed you turns `%2F` into `%252F` and 404s a
+  change that plainly exists. `changePath` unescapes before escaping so both forms work.
 - **Not every endpoint exists on every version.** We target 3.14 and support 3.12+. Draft comment
   endpoints are the ones that move.
 
@@ -111,8 +116,9 @@ Do not use `--no-verify`. If a hook is wrong, fix the hook.
 
 - `internal/gerrit`: `httptest.Server` returning recorded Gerrit payloads. Include the `)]}'` prefix
   in fixtures — it is part of what the client must handle.
-- `internal/mcpserver`: golden files for rendered output, so token-bloat regressions are visible in
-  the diff.
+- `internal/render`: golden files written by hand, not captured with `-update`. A golden taken from
+  the implementation records only what the code happens to do.
+- `internal/mcpserver`: tools driven over an in-memory transport against a stub Gerrit.
 - Tests run with `-race` in CI on Linux, macOS and Windows.
 
 ## Releasing

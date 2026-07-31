@@ -3,6 +3,11 @@
 # lefthook is installed by mise, so the hooks work identically on Linux, macOS
 # and Windows without depending on a POSIX shell being present.
 #
+# Every command goes through `mise exec --`. Git runs hooks in a bare shell
+# that has not sourced anyone's profile, so mise's shims are not on PATH there
+# -- and neither are they when an editor's Git integration commits for you.
+# Resolving the toolchain explicitly is what makes the hooks work everywhere.
+#
 # Install with `just install-hooks`. Skip once with `LEFTHOOK=0 git commit`.
 
 pre-commit:
@@ -10,24 +15,24 @@ pre-commit:
   jobs:
     - name: fmt
       glob: "*.go"
-      run: golangci-lint fmt --diff
+      run: mise exec -- golangci-lint fmt --diff
 
     - name: lint
       glob: "*.go"
-      run: golangci-lint run
+      run: mise exec -- golangci-lint run
 
     - name: tidy
       glob: "go.{mod,sum}"
-      run: go mod tidy && git diff --exit-code go.mod go.sum
+      run: mise exec -- go mod tidy && git diff --exit-code go.mod go.sum
 
 commit-msg:
   jobs:
     - name: commitlint
-      run: npx --no-install commitlint --edit {1}
+      run: mise exec -- npx --no-install commitlint --edit {1}
 
 # Tests are pushed-gated rather than commit-gated: the race detector is too
 # slow to run on every commit, but nothing broken should reach the remote.
 pre-push:
   jobs:
     - name: test
-      run: go test -race ./...
+      run: mise exec -- go test -race ./...

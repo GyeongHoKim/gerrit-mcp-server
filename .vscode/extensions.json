@@ -13,6 +13,10 @@
     "redhat.vscode-yaml",
 
     // Workflow authoring and run status for .github/workflows.
-    "github.vscode-github-actions"
+    "github.vscode-github-actions",
+
+    // VS Code does not read .editorconfig on its own. Without this the golden
+    // fixtures lose their trailing spaces on save and the render tests fail.
+    "editorconfig.editorconfig"
   ]
 }
