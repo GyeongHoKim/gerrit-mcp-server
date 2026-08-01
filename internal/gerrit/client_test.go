@@ -25,6 +25,15 @@ const (
 func newTestClient(t *testing.T, handler http.HandlerFunc) *Client {
 	t.Helper()
 
+	return newTestClientWithTimeout(t, 5*time.Second, handler)
+}
+
+// newTestClientWithTimeout is [newTestClient] with the request timeout under
+// the caller's control. A zero timeout leaves the request bounded only by the
+// test's own context.
+func newTestClientWithTimeout(t *testing.T, timeout time.Duration, handler http.HandlerFunc) *Client {
+	t.Helper()
+
 	server := httptest.NewServer(handler)
 	t.Cleanup(server.Close)
 
@@ -37,7 +46,7 @@ func newTestClient(t *testing.T, handler http.HandlerFunc) *Client {
 		BaseURL: base,
 		User:    testUser,
 		Token:   testToken,
-		Timeout: 5 * time.Second,
+		Timeout: timeout,
 	})
 }
 
@@ -275,7 +284,11 @@ func TestDoUnmappedStatusCarriesDetail(t *testing.T) {
 func TestDoRejectsOversizedResponse(t *testing.T) {
 	t.Parallel()
 
-	client := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+	// No request timeout. The cap under test is a byte count, but moving 33 MiB
+	// across the loopback under -race outlasts the shared 5s budget on slow
+	// hardware, and the test then reports a deadline instead of the cap. The
+	// test's own context still bounds the request.
+	client := newTestClientWithTimeout(t, 0, func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
 		if _, err := io.WriteString(w, xssiPrefix+"\n"); err != nil {
@@ -431,6 +444,50 @@ func TestChangePathEscapesID(t *testing.T) {
 
 			if diff := cmp.Diff(test.want, changePath(test.id, test.suffix)); diff != "" {
 				t.Errorf("changePath() mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestDoRejectsANonJSONBody(t *testing.T) {
+	t.Parallel()
+
+	// The realistic trigger is an SSO proxy in front of Gerrit answering 200
+	// with a login page instead of 401. Decoding has to fail loudly: silently
+	// leaving out at its zero value would hand the model an empty change list
+	// that reads as "no changes matched".
+	tests := map[string]string{
+		"an html login page": "<html><body>Login</body></html>",
+		"an empty body":      "",
+	}
+
+	for name, body := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			client := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+				if _, err := io.WriteString(w, body); err != nil {
+					t.Errorf("writing test response: %v", err)
+				}
+			})
+
+			var got []struct {
+				Subject string `json:"subject"`
+			}
+
+			err := client.do(t.Context(), http.MethodGet, "/changes/", nil, nil, &got)
+			if err == nil {
+				t.Fatal("do() succeeded on a body that is not JSON, want an error")
+			}
+
+			for _, want := range []string{"decoding", "GET", "/changes/"} {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("error = %q, want it to mention %q", err, want)
+				}
+			}
+
+			if got != nil {
+				t.Errorf("out = %v, want it left at its zero value", got)
 			}
 		})
 	}

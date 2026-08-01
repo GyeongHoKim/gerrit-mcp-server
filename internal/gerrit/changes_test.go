@@ -3,6 +3,7 @@ package gerrit
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -550,5 +551,37 @@ func TestCommitMessageBugs(t *testing.T) {
 				t.Errorf("Bugs() mismatch (-want +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestChangesSubmittedTogetherReportsAForbiddenSet(t *testing.T) {
+	t.Parallel()
+
+	// rest-api-changes.txt, Changes Submitted Together: "If the
+	// o=NON_VISIBLE_CHANGES query parameter is not passed, then instead of a
+	// SubmittedTogetherInfo entity, the response is a list of changes, or a
+	// 403 response with a message if the set of changes to be submitted with
+	// this change includes changes the caller cannot read."
+	//
+	// We do not pass that option, so a 403 here does not mean "you may not see
+	// this change" -- it means this change does not submit alone and part of
+	// the set is invisible. The status maps to ErrForbidden either way, so the
+	// only thing that distinguishes the two for the model is Gerrit's own
+	// message, which must survive.
+	client := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+
+		if _, err := io.WriteString(w, "change 456 not visible"); err != nil {
+			t.Errorf("writing test response: %v", err)
+		}
+	})
+
+	_, err := client.ChangesSubmittedTogether(t.Context(), "12345")
+	if !errors.Is(err, ErrForbidden) {
+		t.Fatalf("ChangesSubmittedTogether() error = %v, want ErrForbidden", err)
+	}
+
+	if !strings.Contains(err.Error(), "change 456 not visible") {
+		t.Errorf("error = %q, want Gerrit's explanation of which change is hidden", err)
 	}
 }
