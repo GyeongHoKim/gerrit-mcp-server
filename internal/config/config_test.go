@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"maps"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -320,4 +321,32 @@ func mustParse(t *testing.T, raw string) *url.URL {
 	}
 
 	return parsed
+}
+
+func TestLoadInvalidKeepsTheParsersOwnError(t *testing.T) {
+	t.Parallel()
+
+	// invalid() carries two %w verbs: one for the sentinel, one for whatever
+	// the parser objected to. TestLoadInvalid pins the sentinel. This pins the
+	// other, which is the half that lets a caller reach past "invalid value"
+	// to what was actually wrong with the string.
+	t.Run("a bad bool keeps strconv's syntax error", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := config.Load(lookupFrom(with(map[string]string{config.EnvAllowWrite: "yes please"})))
+		if !errors.Is(err, strconv.ErrSyntax) {
+			t.Errorf("Load() error = %v, want it to match strconv.ErrSyntax", err)
+		}
+	})
+
+	t.Run("a bad url keeps net/url's error", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := config.Load(lookupFrom(with(map[string]string{config.EnvURL: "https://gerrit example.com"})))
+
+		var urlErr *url.Error
+		if !errors.As(err, &urlErr) {
+			t.Errorf("Load() error = %v, want it to carry a *url.Error", err)
+		}
+	})
 }
