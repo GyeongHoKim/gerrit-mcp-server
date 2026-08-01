@@ -131,12 +131,12 @@ func TestReadOnlyServerOmitsExactlyTheWriteTools(t *testing.T) {
 		}
 	}
 
-	if extra != len(writeTools) {
-		t.Errorf("writable server adds %d tools, want %d from writeTools", extra, len(writeTools))
+	if extra != len(writeTools()) {
+		t.Errorf("writable server adds %d tools, want %d from writeTools", extra, len(writeTools()))
 	}
 
-	if len(readOnly) != len(readTools) {
-		t.Errorf("read-only server exposes %d tools, want %d from readTools", len(readOnly), len(readTools))
+	if len(readOnly) != len(readTools()) {
+		t.Errorf("read-only server exposes %d tools, want %d from readTools", len(readOnly), len(readTools()))
 	}
 }
 

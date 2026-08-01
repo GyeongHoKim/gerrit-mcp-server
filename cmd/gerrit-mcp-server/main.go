@@ -41,7 +41,10 @@ func main() {
 // than exiting so that it stays testable.
 func run(ctx context.Context, args []string, stdout io.Writer) error {
 	flags := flag.NewFlagSet("gerrit-mcp-server", flag.ContinueOnError)
-	flags.SetOutput(stdout)
+	// Usage text and parse errors are diagnostics, and stdout is the JSON-RPC
+	// channel. -version is the one thing here that belongs on stdout, and it
+	// writes there explicitly below.
+	flags.SetOutput(os.Stderr)
 	showVersion := flags.Bool("version", false, "print version information and exit")
 
 	if err := flags.Parse(args); err != nil {
