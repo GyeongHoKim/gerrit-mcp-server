@@ -93,6 +93,15 @@ func (e *APIError) Error() string {
 	return message
 }
 
+// errors.Is finds Is by shape, never by name, so a signature that drifted
+// would silently disable every errors.Is in the codebase rather than failing
+// to compile. Pin the shape.
+// errorMatcher is the shape errors.Is looks for on a wrapped error.
+type errorMatcher interface{ Is(error) bool }
+
+//nolint:errcheck // check-blank reads the assertion as a discarded error; there is no call here
+var _ errorMatcher = (*APIError)(nil)
+
 // Is maps the HTTP status onto the package's sentinel errors so that callers
 // can write errors.Is(err, gerrit.ErrNotFound) instead of comparing numbers.
 func (e *APIError) Is(target error) bool {

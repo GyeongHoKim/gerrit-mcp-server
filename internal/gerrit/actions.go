@@ -115,20 +115,20 @@ var ErrIncompleteChange = errors.New("project, branch and subject are all requir
 //
 // The change has no content until an edit is published to it; this only
 // creates the review to hang that on.
-func (c *Client) CreateChange(ctx context.Context, in *ChangeInput) (*ChangeInfo, error) {
-	// Trimmed into a copy rather than in place: the caller lent us this struct
-	// and should get it back as it was.
-	req := *in
-	req.Project = strings.TrimSpace(req.Project)
-	req.Branch = strings.TrimSpace(req.Branch)
-	req.Subject = strings.TrimSpace(req.Subject)
+// Taken by value: the struct is small, the trimming below has to happen on a
+// copy so the caller gets its own back as it was, and a value parameter is
+// that copy without a nil to dereference.
+func (c *Client) CreateChange(ctx context.Context, in ChangeInput) (*ChangeInfo, error) {
+	in.Project = strings.TrimSpace(in.Project)
+	in.Branch = strings.TrimSpace(in.Branch)
+	in.Subject = strings.TrimSpace(in.Subject)
 
-	if req.Project == "" || req.Branch == "" || req.Subject == "" {
+	if in.Project == "" || in.Branch == "" || in.Subject == "" {
 		return nil, ErrIncompleteChange
 	}
 
 	var change ChangeInfo
-	if err := c.do(ctx, http.MethodPost, "/changes/", nil, &req, &change); err != nil {
+	if err := c.do(ctx, http.MethodPost, "/changes/", nil, in, &change); err != nil {
 		return nil, err
 	}
 

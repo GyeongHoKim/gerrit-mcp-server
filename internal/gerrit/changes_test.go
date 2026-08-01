@@ -12,6 +12,39 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
+func TestTimestampRoundTrips(t *testing.T) {
+	t.Parallel()
+
+	// Timestamp embeds time.Time, which promotes an RFC 3339 MarshalJSON. A
+	// type that decodes Gerrit's format and encodes another one is a trap for
+	// whoever first puts a Timestamp in a request body.
+	tests := map[string]string{
+		"gerrit format with nanoseconds":                    `"2026-07-31 06:04:05.000000000"`,
+		"fractional seconds are kept":                       `"2026-07-31 06:04:05.123456789"`,
+		"the zero time is the empty string it decoded from": `""`,
+	}
+
+	for name, raw := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			var decoded Timestamp
+			if err := json.Unmarshal([]byte(raw), &decoded); err != nil {
+				t.Fatalf("Unmarshal(%s) returned an unexpected error: %v", raw, err)
+			}
+
+			encoded, err := json.Marshal(decoded)
+			if err != nil {
+				t.Fatalf("Marshal() returned an unexpected error: %v", err)
+			}
+
+			if diff := cmp.Diff(raw, string(encoded)); diff != "" {
+				t.Errorf("round trip mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestTimestampUnmarshalJSON(t *testing.T) {
 	t.Parallel()
 

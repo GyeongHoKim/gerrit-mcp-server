@@ -181,7 +181,7 @@ func (s *server) addReviewer(
 	_ *mcp.CallToolRequest,
 	in addReviewerInput,
 ) (*mcp.CallToolResult, any, error) {
-	result, err := s.gerrit.AddReviewer(ctx, in.ChangeID, &gerrit.ReviewerInput{
+	result, err := s.gerrit.AddReviewer(ctx, in.ChangeID, gerrit.ReviewerInput{
 		Reviewer:  in.Reviewer,
 		State:     in.State,
 		Confirmed: in.Confirm,
@@ -358,7 +358,7 @@ func (s *server) createChange(
 	_ *mcp.CallToolRequest,
 	in createChangeInput,
 ) (*mcp.CallToolResult, any, error) {
-	change, err := s.gerrit.CreateChange(ctx, &gerrit.ChangeInput{
+	change, err := s.gerrit.CreateChange(ctx, gerrit.ChangeInput{
 		Project:        in.Project,
 		Branch:         in.Branch,
 		Subject:        in.Subject,

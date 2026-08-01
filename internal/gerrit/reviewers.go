@@ -109,10 +109,13 @@ var ErrConfirmationRequired = errors.New("adding this group needs confirmation")
 var ErrEmptyReviewer = errors.New("reviewer must not be empty")
 
 // AddReviewer adds one reviewer or CC to a change.
+//
+// in is taken by value: it is three small fields, and a pointer here would buy
+// nothing but a nil to dereference.
 func (c *Client) AddReviewer(
 	ctx context.Context,
 	changeID string,
-	in *ReviewerInput,
+	in ReviewerInput,
 ) (*ReviewerResult, error) {
 	changeID = strings.TrimSpace(changeID)
 	if changeID == "" {

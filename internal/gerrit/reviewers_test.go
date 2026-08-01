@@ -122,7 +122,7 @@ func TestAddReviewer(t *testing.T) {
 		}
 	})
 
-	got, err := client.AddReviewer(t.Context(), "12345", &ReviewerInput{Reviewer: "bob@example.com"})
+	got, err := client.AddReviewer(t.Context(), "12345", ReviewerInput{Reviewer: "bob@example.com"})
 	if err != nil {
 		t.Fatalf("AddReviewer() returned an unexpected error: %v", err)
 	}
@@ -157,7 +157,7 @@ func TestAddReviewerSurfacesGerritsRefusal(t *testing.T) {
 		}
 	})
 
-	_, err := client.AddReviewer(t.Context(), "12345", &ReviewerInput{Reviewer: "nobody"})
+	_, err := client.AddReviewer(t.Context(), "12345", ReviewerInput{Reviewer: "nobody"})
 	if !errors.Is(err, ErrReviewerRejected) {
 		t.Errorf("AddReviewer() error = %v, want ErrReviewerRejected", err)
 	}
@@ -176,7 +176,7 @@ func TestAddReviewerAsksBeforeAddingALargeGroup(t *testing.T) {
 
 	// Confirmation is a distinct outcome from a refusal: the caller can
 	// retry, and the error has to say so rather than reading as a dead end.
-	_, err := client.AddReviewer(t.Context(), "12345", &ReviewerInput{Reviewer: "everyone"})
+	_, err := client.AddReviewer(t.Context(), "12345", ReviewerInput{Reviewer: "everyone"})
 	if !errors.Is(err, ErrConfirmationRequired) {
 		t.Errorf("AddReviewer() error = %v, want ErrConfirmationRequired", err)
 	}
@@ -201,7 +201,7 @@ func TestAddReviewerRejectsEmptyArguments(t *testing.T) {
 				t.Error("AddReviewer() reached the server, want it to refuse before that")
 			})
 
-			in := &ReviewerInput{Reviewer: test.reviewer}
+			in := ReviewerInput{Reviewer: test.reviewer}
 			if _, err := client.AddReviewer(t.Context(), test.changeID, in); !errors.Is(err, test.want) {
 				t.Errorf("AddReviewer() error = %v, want %v", err, test.want)
 			}

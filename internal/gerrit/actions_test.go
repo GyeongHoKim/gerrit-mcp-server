@@ -285,7 +285,7 @@ func TestCreateChange(t *testing.T) {
 		}
 	})
 
-	got, err := client.CreateChange(t.Context(), &ChangeInput{
+	got, err := client.CreateChange(t.Context(), ChangeInput{
 		Project:        "p",
 		Branch:         "main",
 		Subject:        "add the thing",
@@ -324,11 +324,14 @@ func TestCreateChangeLeavesTheCallersInputAlone(t *testing.T) {
 
 	in := ChangeInput{Project: " p ", Branch: " main ", Subject: " add the thing "}
 
-	if _, err := client.CreateChange(t.Context(), &in); err != nil {
+	if _, err := client.CreateChange(t.Context(), in); err != nil {
 		t.Fatalf("CreateChange() returned an unexpected error: %v", err)
 	}
 
 	// Trimming is what Gerrit is sent, not an edit of what the caller holds.
+	// The value parameter guarantees this now, so the test documents the
+	// promise rather than guarding it -- taking a pointer again would not
+	// compile against these call sites.
 	want := ChangeInput{Project: " p ", Branch: " main ", Subject: " add the thing "}
 	if diff := cmp.Diff(want, in); diff != "" {
 		t.Errorf("CreateChange() modified the caller's input (-want +got):\n%s", diff)
@@ -357,7 +360,7 @@ func TestCreateChangeTrimsWhatItSends(t *testing.T) {
 
 	in := ChangeInput{Project: " p ", Branch: " main ", Subject: " add the thing "}
 
-	if _, err := client.CreateChange(t.Context(), &in); err != nil {
+	if _, err := client.CreateChange(t.Context(), in); err != nil {
 		t.Fatalf("CreateChange() returned an unexpected error: %v", err)
 	}
 
@@ -375,7 +378,7 @@ func TestCreateChangeTrimsWhatItSends(t *testing.T) {
 func TestCreateChangeRequiresProjectBranchAndSubject(t *testing.T) {
 	t.Parallel()
 
-	tests := map[string]*ChangeInput{
+	tests := map[string]ChangeInput{
 		"no project": {Branch: "main", Subject: "s"},
 		"no branch":  {Project: "p", Subject: "s"},
 		"no subject": {Project: "p", Branch: "main"},

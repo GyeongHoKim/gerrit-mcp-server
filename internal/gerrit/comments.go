@@ -106,6 +106,10 @@ type CommentInput struct {
 	Line int `json:"line,omitempty"`
 	// Unresolved marks the comment as needing an answer. Sent even when false
 	// so the intent is explicit rather than inherited from a Gerrit default.
+	//
+	// Gerrit documents this as defaulting to the value of the in_reply_to
+	// comment, so always sending it means a reply to an unresolved thread
+	// resolves that thread unless the caller says otherwise.
 	Unresolved bool `json:"unresolved"`
 }
 
