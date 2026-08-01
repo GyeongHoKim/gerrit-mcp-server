@@ -131,16 +131,25 @@ type Options struct {
 	User string
 	// Token is the auth token from that account's HTTP Credentials page.
 	Token string
-	// Timeout bounds a single request. Zero leaves the request unbounded,
-	// which only makes sense in a test.
+	// Timeout bounds a single request. Zero selects [DefaultTimeout].
 	Timeout time.Duration
 }
+
+// DefaultTimeout bounds a request whose [Options] did not choose a timeout.
+//
+// A client is a network client; leaving http.Client's own zero value in place
+// would make an unreachable host hang the tool call rather than fail it.
+const DefaultTimeout = 30 * time.Second
 
 // New returns a client for the host in opts.
 //
 // The caller is responsible for the validation: this package takes the host
 // and credentials as given rather than knowing where they came from.
 func New(opts Options) *Client {
+	if opts.Timeout <= 0 {
+		opts.Timeout = DefaultTimeout
+	}
+
 	return &Client{
 		baseURL:    opts.BaseURL,
 		httpClient: &http.Client{Timeout: opts.Timeout},

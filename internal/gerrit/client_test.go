@@ -28,9 +28,10 @@ func newTestClient(t *testing.T, handler http.HandlerFunc) *Client {
 	return newTestClientWithTimeout(t, 5*time.Second, handler)
 }
 
-// newTestClientWithTimeout is [newTestClient] with the request timeout under
-// the caller's control. A zero timeout leaves the request bounded only by the
-// test's own context.
+// newTestClientWithTimeout is [newTestClient] for the one test whose payload
+// outlasts the shared budget. It stays a timeout rather than no timeout: a
+// test context carries no deadline, so an unbounded client against a stalled
+// handler hangs until go test's own timeout takes the whole package with it.
 func newTestClientWithTimeout(t *testing.T, timeout time.Duration, handler http.HandlerFunc) *Client {
 	t.Helper()
 
@@ -284,11 +285,11 @@ func TestDoUnmappedStatusCarriesDetail(t *testing.T) {
 func TestDoRejectsOversizedResponse(t *testing.T) {
 	t.Parallel()
 
-	// No request timeout. The cap under test is a byte count, but moving 33 MiB
-	// across the loopback under -race outlasts the shared 5s budget on slow
-	// hardware, and the test then reports a deadline instead of the cap. The
-	// test's own context still bounds the request.
-	client := newTestClientWithTimeout(t, 0, func(w http.ResponseWriter, _ *http.Request) {
+	// A generous timeout rather than the shared 5s one. The cap under test is a
+	// byte count, but moving 33 MiB across the loopback under -race outlasts
+	// five seconds on slow hardware, and the test then reports a deadline
+	// instead of the cap it exists to assert.
+	client := newTestClientWithTimeout(t, 10*time.Minute, func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
 		if _, err := io.WriteString(w, xssiPrefix+"\n"); err != nil {
@@ -490,5 +491,28 @@ func TestDoRejectsANonJSONBody(t *testing.T) {
 				t.Errorf("out = %v, want it left at its zero value", got)
 			}
 		})
+	}
+}
+
+func TestNewDefaultsAZeroTimeout(t *testing.T) {
+	t.Parallel()
+
+	// http.Client's own zero value is no timeout at all, which would let an
+	// unreachable host hang a tool call instead of failing it. config.Load
+	// rejects a non-positive GERRIT_TIMEOUT, but Options is exported and is
+	// now the only way in, so the guarantee has to live here too.
+	client := New(Options{BaseURL: &url.URL{Scheme: "https", Host: "gerrit.example.com"}})
+
+	if client.httpClient.Timeout != DefaultTimeout {
+		t.Errorf("Timeout = %v, want %v", client.httpClient.Timeout, DefaultTimeout)
+	}
+
+	chosen := New(Options{
+		BaseURL: &url.URL{Scheme: "https", Host: "gerrit.example.com"},
+		Timeout: time.Second,
+	})
+
+	if chosen.httpClient.Timeout != time.Second {
+		t.Errorf("Timeout = %v, want the caller's 1s to win", chosen.httpClient.Timeout)
 	}
 }
