@@ -115,10 +115,9 @@ var ErrIncompleteChange = errors.New("project, branch and subject are all requir
 //
 // The change has no content until an edit is published to it; this only
 // creates the review to hang that on.
-// Taken by value: the struct is small, the trimming below has to happen on a
-// copy so the caller gets its own back as it was, and a value parameter is
-// that copy without a nil to dereference.
 func (c *Client) CreateChange(ctx context.Context, in ChangeInput) (*ChangeInfo, error) {
+	// Trimmed in place, which is safe because in is a copy: the caller lent us
+	// these values and gets its own struct back as it was.
 	in.Project = strings.TrimSpace(in.Project)
 	in.Branch = strings.TrimSpace(in.Branch)
 	in.Subject = strings.TrimSpace(in.Subject)

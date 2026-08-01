@@ -6,8 +6,6 @@ import (
 	"io"
 	"net/http"
 	"testing"
-
-	"github.com/google/go-cmp/cmp"
 )
 
 func TestSetTopic(t *testing.T) {
@@ -310,31 +308,6 @@ func TestCreateChange(t *testing.T) {
 
 	if got.Number != 500 {
 		t.Errorf("Number = %d, want 500", got.Number)
-	}
-}
-
-func TestCreateChangeLeavesTheCallersInputAlone(t *testing.T) {
-	t.Parallel()
-
-	client := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
-		if _, err := w.Write([]byte(xssiPrefix + "\n" + `{"_number": 500}`)); err != nil {
-			t.Errorf("writing test response: %v", err)
-		}
-	})
-
-	in := ChangeInput{Project: " p ", Branch: " main ", Subject: " add the thing "}
-
-	if _, err := client.CreateChange(t.Context(), in); err != nil {
-		t.Fatalf("CreateChange() returned an unexpected error: %v", err)
-	}
-
-	// Trimming is what Gerrit is sent, not an edit of what the caller holds.
-	// The value parameter guarantees this now, so the test documents the
-	// promise rather than guarding it -- taking a pointer again would not
-	// compile against these call sites.
-	want := ChangeInput{Project: " p ", Branch: " main ", Subject: " add the thing "}
-	if diff := cmp.Diff(want, in); diff != "" {
-		t.Errorf("CreateChange() modified the caller's input (-want +got):\n%s", diff)
 	}
 }
 

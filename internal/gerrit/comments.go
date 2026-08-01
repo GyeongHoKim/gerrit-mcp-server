@@ -11,16 +11,12 @@ import (
 	"strings"
 )
 
-// Comment sides for [CommentInfo.Side] and [CommentInput.Side].
+// SideParent is the [CommentInfo.Side] and [CommentInput.Side] value for a
+// comment against the old file. Gerrit's default, REVISION, is the new one.
 //
-// Which file a line number counts against: line 42 of the old file and line 42
-// of the new one are different lines.
-const (
-	// SideRevision is the new file, and is Gerrit's default.
-	SideRevision = "REVISION"
-	// SideParent is the old file.
-	SideParent = "PARENT"
-)
+// Which side a comment sits on decides what its line number counts against:
+// line 42 of the old file and line 42 of the new one are different lines.
+const SideParent = "PARENT"
 
 // CommentRange is a character range within a file.
 type CommentRange struct {
