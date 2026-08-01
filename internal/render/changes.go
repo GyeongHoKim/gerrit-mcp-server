@@ -27,7 +27,7 @@ func Changes(changes []gerrit.ChangeInfo) string {
 
 	var out strings.Builder
 
-	writeCount(&out, len(changes))
+	writeCount(&out, len(changes), "change")
 
 	// Gerrit flags a result set it cut short on the final entry. Reporting the
 	// count without saying so would state that a project has 25 open changes
@@ -48,14 +48,18 @@ func Changes(changes []gerrit.ChangeInfo) string {
 	return out.String()
 }
 
-// writeCount appends a change count with the noun agreeing with it.
-func writeCount(out *strings.Builder, count int) {
-	out.WriteString(strconv.Itoa(count))
+// writeCount appends "<n> <noun>", with the noun agreeing with n.
+//
+// Used across the package: nine sites had each spelled this branch out, in
+// three different shapes, for nouns that all pluralise the same way. One copy
+// of a sentence fragment inside one package buys no independence.
+func writeCount(out *strings.Builder, n int, noun string) {
+	out.WriteString(strconv.Itoa(n))
+	out.WriteString(" ")
+	out.WriteString(noun)
 
-	if count == 1 {
-		out.WriteString(" change")
-	} else {
-		out.WriteString(" changes")
+	if n != 1 {
+		out.WriteString("s")
 	}
 }
 
@@ -124,7 +128,7 @@ func SubmittedTogether(changes []gerrit.ChangeInfo) string {
 
 	var out strings.Builder
 
-	writeCount(&out, len(changes))
+	writeCount(&out, len(changes), "change")
 
 	// A single entry should not reach here -- Gerrit answers with an empty
 	// list, not a list of one, when a change submits alone -- but the count is

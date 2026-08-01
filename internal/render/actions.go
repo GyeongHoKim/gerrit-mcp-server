@@ -71,13 +71,7 @@ func SubmissionReverted(changeID string, reverts *gerrit.RevertSubmissionInfo) s
 	var out strings.Builder
 
 	out.WriteString("Created ")
-	out.WriteString(strconv.Itoa(len(changes)))
-	out.WriteString(" change")
-
-	if len(changes) != 1 {
-		out.WriteString("s")
-	}
-
+	writeCount(&out, len(changes), "change")
 	out.WriteString(" reverting the submission containing ")
 	out.WriteString(changeID)
 	out.WriteString(".\n")

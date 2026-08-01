@@ -24,14 +24,8 @@ func Files(files map[string]gerrit.FileInfo) string {
 
 	var out strings.Builder
 
-	if len(files) == 1 {
-		out.WriteString("1 file.\n")
-	} else {
-		out.WriteString(strconv.Itoa(len(files)))
-		out.WriteString(" files.\n")
-	}
-
-	out.WriteString("\n")
+	writeCount(&out, len(files), "file")
+	out.WriteString(".\n\n")
 
 	for _, path := range slices.Sorted(maps.Keys(files)) {
 		writeFile(&out, path, files[path])
@@ -93,18 +87,21 @@ func Diff(path string, diff *gerrit.DiffInfo) string {
 		return out.String()
 	}
 
+	// Rendered into its own buffer first: whether there is a body at all is
+	// what decides between the legend and the "no changes" line, and deciding
+	// it up front beats writing the legend and trimming it back off.
+	var body strings.Builder
+
+	if writeDiffBody(&body, diff.Content) == 0 {
+		out.WriteString("No textual changes.\n")
+
+		return out.String()
+	}
+
 	// The legend costs one line and saves the model from guessing which side
 	// a number refers to.
-	legend := "Line numbers: '-' rows are the old file, others the new.\n\n"
-	out.WriteString(legend)
-
-	if writeDiffBody(&out, diff.Content) == 0 {
-		// Nothing was written, so the legend describes nothing.
-		body := out.String()
-		out.Reset()
-		out.WriteString(strings.TrimSuffix(body, legend))
-		out.WriteString("No textual changes.\n")
-	}
+	out.WriteString("Line numbers: '-' rows are the old file, others the new.\n\n")
+	out.WriteString(body.String())
 
 	return out.String()
 }

@@ -79,21 +79,9 @@ func countComments(byFile map[string][]gerrit.CommentInfo) commentCounts {
 
 // writeCommentHeader appends the "N comments on M files" summary.
 func writeCommentHeader(out *strings.Builder, total, files int, noun string) {
-	out.WriteString(strconv.Itoa(total))
-	out.WriteString(" ")
-	out.WriteString(noun)
-
-	if total != 1 {
-		out.WriteString("s")
-	}
-
+	writeCount(out, total, noun)
 	out.WriteString(" on ")
-	out.WriteString(strconv.Itoa(files))
-	out.WriteString(" file")
-
-	if files != 1 {
-		out.WriteString("s")
-	}
+	writeCount(out, files, "file")
 }
 
 // writeCommentBodies appends one section per file, sorted by path.
@@ -154,7 +142,7 @@ func commentLocation(comment *gerrit.CommentInfo) string {
 		location = "line " + strconv.Itoa(comment.Line)
 	}
 
-	if comment.Side == "PARENT" {
+	if comment.Side == gerrit.SideParent {
 		location += " (old side)"
 	}
 
@@ -210,10 +198,13 @@ func DraftsDeleted(changeID string, count int) string {
 		return "No draft comments were staged on change " + changeID + ".\n"
 	}
 
-	noun := " draft comments"
-	if count == 1 {
-		noun = " draft comment"
-	}
+	var out strings.Builder
 
-	return "Discarded " + strconv.Itoa(count) + noun + " on change " + changeID + ".\n"
+	out.WriteString("Discarded ")
+	writeCount(&out, count, "draft comment")
+	out.WriteString(" on change ")
+	out.WriteString(changeID)
+	out.WriteString(".\n")
+
+	return out.String()
 }
