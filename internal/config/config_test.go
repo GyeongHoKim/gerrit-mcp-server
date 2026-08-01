@@ -1,6 +1,7 @@
 package config_test
 
 import (
+	"errors"
 	"log/slog"
 	"maps"
 	"net/url"
@@ -183,12 +184,19 @@ func TestLoadInvalid(t *testing.T) {
 
 	tests := map[string]struct {
 		env map[string]string
+		// wantCause is the sentinel the error must match. ErrMissing and
+		// ErrInvalid are exported precisely so a caller can tell "you did not
+		// set this" from "what you set is unusable", and the chain that
+		// carries them -- two %w verbs in one Errorf, under an errors.Join --
+		// is exactly the kind that breaks without anything failing.
+		wantCause error
 		// wantMentions are substrings the error must contain, so that the
 		// message actually tells the user which variable to fix.
 		wantMentions []string
 	}{
 		"missing url": {
 			env:          map[string]string{config.EnvUser: "alice", config.EnvToken: "s3cret"},
+			wantCause:    config.ErrMissing,
 			wantMentions: []string{config.EnvURL},
 		},
 		"missing user": {
@@ -196,6 +204,7 @@ func TestLoadInvalid(t *testing.T) {
 				config.EnvURL:   "https://gerrit.example.com",
 				config.EnvToken: "s3cret",
 			},
+			wantCause:    config.ErrMissing,
 			wantMentions: []string{config.EnvUser},
 		},
 		"missing token": {
@@ -203,59 +212,73 @@ func TestLoadInvalid(t *testing.T) {
 				config.EnvURL:  "https://gerrit.example.com",
 				config.EnvUser: "alice",
 			},
+			wantCause:    config.ErrMissing,
 			wantMentions: []string{config.EnvToken},
 		},
 		"every missing variable is reported at once": {
 			env:          map[string]string{},
+			wantCause:    config.ErrMissing,
 			wantMentions: []string{config.EnvURL, config.EnvUser, config.EnvToken},
 		},
 		"empty value counts as missing": {
 			env:          with(map[string]string{config.EnvUser: ""}),
+			wantCause:    config.ErrMissing,
 			wantMentions: []string{config.EnvUser},
 		},
 		"url without a scheme": {
 			env:          with(map[string]string{config.EnvURL: "gerrit.example.com"}),
+			wantCause:    config.ErrInvalid,
 			wantMentions: []string{config.EnvURL},
 		},
 		"url with a non http scheme": {
 			env:          with(map[string]string{config.EnvURL: "ftp://gerrit.example.com"}),
+			wantCause:    config.ErrInvalid,
 			wantMentions: []string{config.EnvURL},
 		},
 		"url carrying a fragment": {
 			env:          with(map[string]string{config.EnvURL: "https://gerrit.example.com/#/q/status:open"}),
+			wantCause:    config.ErrInvalid,
 			wantMentions: []string{config.EnvURL},
 		},
 		"url carrying a query string": {
 			env:          with(map[string]string{config.EnvURL: "https://gerrit.example.com/?foo=1"}),
+			wantCause:    config.ErrInvalid,
 			wantMentions: []string{config.EnvURL},
 		},
 		"url carrying credentials": {
 			//nolint:gosec // G101: the fake credential is the point of this case
 			env:          with(map[string]string{config.EnvURL: "https://user:hunter2@gerrit.example.com"}),
+			wantCause:    config.ErrInvalid,
 			wantMentions: []string{config.EnvURL},
 		},
 		"unparsable url": {
 			env:          with(map[string]string{config.EnvURL: "https://gerrit example.com"}),
+			wantCause:    config.ErrInvalid,
 			wantMentions: []string{config.EnvURL},
 		},
 		"unparsable timeout": {
 			env:          with(map[string]string{config.EnvTimeout: "soon"}),
+			wantCause:    config.ErrInvalid,
 			wantMentions: []string{config.EnvTimeout},
 		},
 		"zero timeout": {
 			env:          with(map[string]string{config.EnvTimeout: "0s"}),
+			wantCause:    config.ErrInvalid,
 			wantMentions: []string{config.EnvTimeout},
 		},
 		"negative timeout": {
 			env:          with(map[string]string{config.EnvTimeout: "-1s"}),
+			wantCause:    config.ErrInvalid,
 			wantMentions: []string{config.EnvTimeout},
 		},
 		"unknown allow write value": {
 			env:          with(map[string]string{config.EnvAllowWrite: "yes please"}),
+			wantCause:    config.ErrInvalid,
 			wantMentions: []string{config.EnvAllowWrite},
 		},
 		"unknown log level": {
 			env:          with(map[string]string{config.EnvLogLevel: "chatty"}),
+			wantCause:    config.ErrInvalid,
 			wantMentions: []string{config.EnvLogLevel},
 		},
 	}
@@ -267,6 +290,10 @@ func TestLoadInvalid(t *testing.T) {
 			_, err := config.Load(lookupFrom(test.env))
 			if err == nil {
 				t.Fatal("Load() succeeded, want an error")
+			}
+
+			if !errors.Is(err, test.wantCause) {
+				t.Errorf("Load() error = %v, want it to match %v", err, test.wantCause)
 			}
 
 			for _, mention := range test.wantMentions {
