@@ -13,8 +13,6 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-
-	"github.com/GyeongHoKim/gerrit-mcp-server/internal/config"
 )
 
 const (
@@ -35,7 +33,7 @@ func newTestClient(t *testing.T, handler http.HandlerFunc) *Client {
 		t.Fatalf("parsing test server url: %v", err)
 	}
 
-	return New(config.Config{
+	return New(Options{
 		BaseURL: base,
 		User:    testUser,
 		Token:   testToken,
@@ -382,7 +380,7 @@ func TestDoPreservesBaseURLSubPath(t *testing.T) {
 		t.Fatalf("parsing test server url: %v", err)
 	}
 
-	client := New(config.Config{
+	client := New(Options{
 		BaseURL: base,
 		User:    testUser,
 		Token:   testToken,

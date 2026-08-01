@@ -8,7 +8,6 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/GyeongHoKim/gerrit-mcp-server/internal/config"
 	"github.com/GyeongHoKim/gerrit-mcp-server/internal/gerrit"
 	"github.com/GyeongHoKim/gerrit-mcp-server/internal/version"
 )
@@ -23,7 +22,7 @@ func newGerrit(t *testing.T) *gerrit.Client {
 		t.Fatalf("parsing base url: %v", err)
 	}
 
-	return gerrit.New(config.Config{
+	return gerrit.New(gerrit.Options{
 		BaseURL: base,
 		User:    "alice",
 		Token:   "s3cret",

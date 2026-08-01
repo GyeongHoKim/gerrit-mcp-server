@@ -14,8 +14,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
-	"github.com/GyeongHoKim/gerrit-mcp-server/internal/config"
 	"github.com/GyeongHoKim/gerrit-mcp-server/internal/version"
 )
 
@@ -109,16 +109,34 @@ type Client struct {
 	token      string
 }
 
-// New returns a client for the host in cfg.
+// Options describes the host a [Client] talks to and the account it talks as.
 //
-// cfg is expected to have come from [config.Load], which has already rejected
-// a missing host or credentials.
-func New(cfg config.Config) *Client {
+// A struct rather than four parameters: User and Token are both strings, and
+// nothing in the type system would catch them being handed over the wrong way
+// round.
+type Options struct {
+	// BaseURL is the Gerrit host, without a trailing slash. It must be
+	// absolute and carry no query or fragment -- endpoint concatenates onto it.
+	BaseURL *url.URL
+	// User is the Gerrit account name used for HTTP Basic auth.
+	User string
+	// Token is the auth token from that account's HTTP Credentials page.
+	Token string
+	// Timeout bounds a single request. Zero leaves the request unbounded,
+	// which only makes sense in a test.
+	Timeout time.Duration
+}
+
+// New returns a client for the host in opts.
+//
+// The caller is responsible for the validation: this package takes the host
+// and credentials as given rather than knowing where they came from.
+func New(opts Options) *Client {
 	return &Client{
-		baseURL:    cfg.BaseURL,
-		httpClient: &http.Client{Timeout: cfg.Timeout},
-		user:       cfg.User,
-		token:      cfg.Token,
+		baseURL:    opts.BaseURL,
+		httpClient: &http.Client{Timeout: opts.Timeout},
+		user:       opts.User,
+		token:      opts.Token,
 	}
 }
 

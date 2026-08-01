@@ -85,7 +85,14 @@ func serve(ctx context.Context) error {
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	server := mcpserver.New(gerrit.New(cfg), cfg.AllowWrite)
+	client := gerrit.New(gerrit.Options{
+		BaseURL: cfg.BaseURL,
+		User:    cfg.User,
+		Token:   cfg.Token,
+		Timeout: cfg.Timeout,
+	})
+
+	server := mcpserver.New(client, cfg.AllowWrite)
 
 	if err = server.Run(ctx, &mcp.StdioTransport{}); err != nil {
 		return fmt.Errorf("serving over stdio: %w", err)

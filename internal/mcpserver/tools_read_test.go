@@ -11,7 +11,6 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/GyeongHoKim/gerrit-mcp-server/internal/config"
 	"github.com/GyeongHoKim/gerrit-mcp-server/internal/gerrit"
 )
 
@@ -27,7 +26,7 @@ func newServerAgainst(t *testing.T, handler http.HandlerFunc) *mcp.Server {
 		t.Fatalf("parsing stub url: %v", err)
 	}
 
-	return New(gerrit.New(config.Config{
+	return New(gerrit.New(gerrit.Options{
 		BaseURL: base,
 		User:    "alice",
 		Token:   "s3cret",
