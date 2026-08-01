@@ -437,3 +437,52 @@ func TestDeleteAllDraftCommentsReportsPartialProgress(t *testing.T) {
 		t.Errorf("count = %d, want 1 -- the first deletion is not undone by the second failing", count)
 	}
 }
+
+func TestDeleteAllDraftCommentsTrimsTheChangeID(t *testing.T) {
+	t.Parallel()
+
+	var deleted []string
+
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			if _, err := w.Write([]byte(xssiPrefix + "\n" + `{"src/widget.go": [{"id": "d1"}]}`)); err != nil {
+				t.Errorf("writing test response: %v", err)
+			}
+
+			return
+		}
+
+		deleted = append(deleted, r.URL.EscapedPath())
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	// A change id arrives from model-authored JSON, so a stray space is
+	// plausible. The listing trims its own copy, so only the deletion path
+	// notices -- it would escape the space and 404 a change that plainly exists.
+	count, err := client.DeleteAllDraftComments(t.Context(), "  12345  ")
+	if err != nil {
+		t.Fatalf("DeleteAllDraftComments() returned an unexpected error: %v", err)
+	}
+
+	if count != 1 {
+		t.Errorf("count = %d, want 1", count)
+	}
+
+	want := []string{"/a/changes/12345/revisions/current/drafts/d1"}
+	if diff := cmp.Diff(want, deleted); diff != "" {
+		t.Errorf("deleted drafts mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestDeleteAllDraftCommentsRejectsAnEmptyChangeID(t *testing.T) {
+	t.Parallel()
+
+	client := newTestClient(t, func(_ http.ResponseWriter, r *http.Request) {
+		t.Errorf("unexpected %s %s, want no request for an empty change id", r.Method, r.URL.Path)
+	})
+
+	_, err := client.DeleteAllDraftComments(t.Context(), "   ")
+	if !errors.Is(err, ErrEmptyChangeID) {
+		t.Errorf("err = %v, want ErrEmptyChangeID", err)
+	}
+}

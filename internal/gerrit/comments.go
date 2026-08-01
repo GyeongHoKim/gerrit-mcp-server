@@ -257,6 +257,15 @@ func (c *Client) deleteDraft(ctx context.Context, changeID, draftID string, patc
 // a time. A failure part way through leaves the earlier deletions in place --
 // they are already gone -- and reports what happened.
 func (c *Client) DeleteAllDraftComments(ctx context.Context, changeID string) (int, error) {
+	// Trimmed here rather than left to ListDraftComments, which trims its own
+	// local copy: the untrimmed id would still reach deleteDraft below, where
+	// changePath escapes the leading space and Gerrit answers 404 on a change
+	// whose drafts were just listed successfully.
+	changeID = strings.TrimSpace(changeID)
+	if changeID == "" {
+		return 0, ErrEmptyChangeID
+	}
+
 	byFile, err := c.ListDraftComments(ctx, changeID)
 	if err != nil {
 		return 0, err
