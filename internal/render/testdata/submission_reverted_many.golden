@@ -1,0 +1,9 @@
+Created 2 changes reverting the submission containing 12345.
+
+[101] NEW +0/-10 — Revert "first"
+  p ~ main · alice
+
+[102] NEW +0/-4 — Revert "second"
+  q ~ main · bob
+
+Every revert still has to be reviewed and submitted.
