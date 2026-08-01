@@ -65,12 +65,15 @@ func (t Timestamp) MarshalJSON() ([]byte, error) {
 		return []byte(`""`), nil
 	}
 
-	encoded, err := json.Marshal(t.Format(timestampLayout))
-	if err != nil {
-		return nil, fmt.Errorf("encoding gerrit timestamp: %w", err)
-	}
-
-	return encoded, nil
+	// Converted to UTC first. The layout carries no zone, so formatting a
+	// value in any other location would send local wall-clock digits that
+	// Gerrit reads as UTC -- silently moving the instant. Decoded values are
+	// already UTC; one built in Go from time.Now() is not.
+	//
+	// Quoted directly rather than through json.Marshal: the layout produces
+	// only digits and punctuation that JSON needs no escaping for, so there is
+	// no error to report and no unreachable branch to leave behind.
+	return []byte(`"` + t.UTC().Format(timestampLayout) + `"`), nil
 }
 
 // AccountInfo identifies a Gerrit user.

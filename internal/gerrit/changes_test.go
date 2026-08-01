@@ -46,6 +46,36 @@ func TestTimestampRoundTrips(t *testing.T) {
 	}
 }
 
+func TestTimestampMarshalsInUTC(t *testing.T) {
+	t.Parallel()
+
+	// Starting from a decoded value would prove nothing: time.Parse returns
+	// UTC, so every value that has been through UnmarshalJSON is already in
+	// the only location that formats correctly. A Timestamp built in Go from
+	// time.Now() is not, and the layout carries no zone to give the mistake
+	// away -- Gerrit reads whatever digits arrive as UTC.
+	kst := time.FixedZone("KST", 9*60*60)
+	local := Timestamp{Time: time.Date(2026, time.July, 31, 15, 4, 5, 0, kst)}
+
+	encoded, err := json.Marshal(local)
+	if err != nil {
+		t.Fatalf("Marshal() returned an unexpected error: %v", err)
+	}
+
+	if want := `"2026-07-31 06:04:05.000000000"`; string(encoded) != want {
+		t.Errorf("encoded = %s, want %s", encoded, want)
+	}
+
+	var decoded Timestamp
+	if err = json.Unmarshal(encoded, &decoded); err != nil {
+		t.Fatalf("Unmarshal(%s) returned an unexpected error: %v", encoded, err)
+	}
+
+	if !decoded.Equal(local.Time) {
+		t.Errorf("instant = %v, want it to survive its own encoder as %v", decoded.Time, local.Time)
+	}
+}
+
 func TestTimestampUnmarshalJSON(t *testing.T) {
 	t.Parallel()
 
