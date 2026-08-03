@@ -22,6 +22,15 @@ type Timestamp struct {
 	time.Time
 }
 
+// Timestamp embeds time.Time, which already supplies an RFC 3339
+// UnmarshalJSON. encoding/json picks the override by shape, so a receiver or
+// signature that drifted would leave the inherited one in place and fail to
+// parse every Gerrit timestamp, with nothing to see at compile time.
+var (
+	_ json.Unmarshaler = (*Timestamp)(nil)
+	_ json.Marshaler   = Timestamp{}
+)
+
 // UnmarshalJSON decodes Gerrit's timestamp format. An empty string decodes to
 // the zero time, which is how optional timestamps arrive.
 func (t *Timestamp) UnmarshalJSON(data []byte) error {
@@ -44,6 +53,27 @@ func (t *Timestamp) UnmarshalJSON(data []byte) error {
 	t.Time = parsed
 
 	return nil
+}
+
+// MarshalJSON encodes Gerrit's timestamp format, and the zero time as the
+// empty string that Gerrit uses for an absent one.
+//
+// Without it the embedded time.Time would supply RFC 3339, and the type would
+// decode one format and encode another.
+func (t Timestamp) MarshalJSON() ([]byte, error) {
+	if t.IsZero() {
+		return []byte(`""`), nil
+	}
+
+	// Converted to UTC first. The layout carries no zone, so formatting a
+	// value in any other location would send local wall-clock digits that
+	// Gerrit reads as UTC -- silently moving the instant. Decoded values are
+	// already UTC; one built in Go from time.Now() is not.
+	//
+	// Quoted directly rather than through json.Marshal: the layout produces
+	// only digits and punctuation that JSON needs no escaping for, so there is
+	// no error to report and no unreachable branch to leave behind.
+	return []byte(`"` + t.UTC().Format(timestampLayout) + `"`), nil
 }
 
 // AccountInfo identifies a Gerrit user.

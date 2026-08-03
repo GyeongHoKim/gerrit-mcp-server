@@ -103,3 +103,28 @@ func TestReadToolsAreAnnotatedReadOnly(t *testing.T) {
 		}
 	}
 }
+
+func TestWriteToolsAreNotAnnotatedReadOnly(t *testing.T) {
+	t.Parallel()
+
+	listed, err := connect(t, New(newGerrit(t), true)).ListTools(t.Context(), nil)
+	if err != nil {
+		t.Fatalf("listing tools: %v", err)
+	}
+
+	for _, tool := range listed.Tools {
+		if !slices.Contains(wantWriteTools, tool.Name) {
+			continue
+		}
+
+		// The complement of TestReadToolsAreAnnotatedReadOnly, and the
+		// direction that actually costs something: the read registrars all
+		// carry this annotation as a literal, so copy-pasting one onto a write
+		// registrar is a plausible edit. Nothing else would catch it -- the
+		// tool would still be gated on GERRIT_ALLOW_WRITE and still carry its
+		// destructive hint -- and a client would run it without asking.
+		if tool.Annotations != nil && tool.Annotations.ReadOnlyHint {
+			t.Errorf("%s mutates Gerrit but is annotated read-only", tool.Name)
+		}
+	}
+}

@@ -112,7 +112,7 @@ var ErrEmptyReviewer = errors.New("reviewer must not be empty")
 func (c *Client) AddReviewer(
 	ctx context.Context,
 	changeID string,
-	in *ReviewerInput,
+	in ReviewerInput,
 ) (*ReviewerResult, error) {
 	changeID = strings.TrimSpace(changeID)
 	if changeID == "" {

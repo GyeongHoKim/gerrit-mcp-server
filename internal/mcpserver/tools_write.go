@@ -107,13 +107,11 @@ type deleteDraftCommentInput struct {
 
 // registerDeleteDraftComment installs the delete_draft_comment tool.
 func registerDeleteDraftComment(s *server, srv *mcp.Server) {
-	destructive := true
-
 	mcp.AddTool(srv, &mcp.Tool{
 		Name: "delete_draft_comment",
 		Description: "Discard one of your staged draft comments on a Gerrit change. " +
 			"The draft is gone; this cannot be undone.",
-		Annotations: &mcp.ToolAnnotations{DestructiveHint: &destructive},
+		Annotations: &mcp.ToolAnnotations{DestructiveHint: new(true)},
 	}, s.deleteDraftComment)
 }
 
@@ -132,13 +130,11 @@ func (s *server) deleteDraftComment(
 
 // registerDeleteDraftComments installs the delete_draft_comments tool.
 func registerDeleteDraftComments(s *server, srv *mcp.Server) {
-	destructive := true
-
 	mcp.AddTool(srv, &mcp.Tool{
 		Name: "delete_draft_comments",
 		Description: "Discard every draft comment you have staged on a Gerrit change. " +
 			"The drafts are gone; this cannot be undone.",
-		Annotations: &mcp.ToolAnnotations{DestructiveHint: &destructive},
+		Annotations: &mcp.ToolAnnotations{DestructiveHint: new(true)},
 	}, s.deleteDraftComments)
 }
 
@@ -185,7 +181,7 @@ func (s *server) addReviewer(
 	_ *mcp.CallToolRequest,
 	in addReviewerInput,
 ) (*mcp.CallToolResult, any, error) {
-	result, err := s.gerrit.AddReviewer(ctx, in.ChangeID, &gerrit.ReviewerInput{
+	result, err := s.gerrit.AddReviewer(ctx, in.ChangeID, gerrit.ReviewerInput{
 		Reviewer:  in.Reviewer,
 		State:     in.State,
 		Confirmed: in.Confirm,
@@ -286,13 +282,11 @@ func (s *server) setWorkInProgress(
 
 // registerAbandonChange installs the abandon_change tool.
 func registerAbandonChange(s *server, srv *mcp.Server) {
-	destructive := true
-
 	mcp.AddTool(srv, &mcp.Tool{
 		Name: "abandon_change",
 		Description: "Abandon a Gerrit change, stopping work on it without merging. " +
 			"This server cannot restore an abandoned change.",
-		Annotations: &mcp.ToolAnnotations{DestructiveHint: &destructive},
+		Annotations: &mcp.ToolAnnotations{DestructiveHint: new(true)},
 	}, s.abandonChange)
 }
 
@@ -312,13 +306,11 @@ func (s *server) abandonChange(
 
 // registerRevertChange installs the revert_change tool.
 func registerRevertChange(s *server, srv *mcp.Server) {
-	destructive := true
-
 	mcp.AddTool(srv, &mcp.Tool{
 		Name: "revert_change",
 		Description: "Create a new Gerrit change that reverts a merged one. " +
 			"The revert still has to be reviewed and submitted.",
-		Annotations: &mcp.ToolAnnotations{DestructiveHint: &destructive},
+		Annotations: &mcp.ToolAnnotations{DestructiveHint: new(true)},
 	}, s.revertChange)
 }
 
@@ -366,7 +358,7 @@ func (s *server) createChange(
 	_ *mcp.CallToolRequest,
 	in createChangeInput,
 ) (*mcp.CallToolResult, any, error) {
-	change, err := s.gerrit.CreateChange(ctx, &gerrit.ChangeInput{
+	change, err := s.gerrit.CreateChange(ctx, gerrit.ChangeInput{
 		Project:        in.Project,
 		Branch:         in.Branch,
 		Subject:        in.Subject,
@@ -382,13 +374,11 @@ func (s *server) createChange(
 
 // registerRevertSubmission installs the revert_submission tool.
 func registerRevertSubmission(s *server, srv *mcp.Server) {
-	destructive := true
-
 	mcp.AddTool(srv, &mcp.Tool{
 		Name: "revert_submission",
 		Description: "Create changes reverting every change submitted together with this one. " +
 			"The reverts still have to be reviewed and submitted.",
-		Annotations: &mcp.ToolAnnotations{DestructiveHint: &destructive},
+		Annotations: &mcp.ToolAnnotations{DestructiveHint: new(true)},
 	}, s.revertSubmission)
 }
 

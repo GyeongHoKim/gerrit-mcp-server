@@ -14,8 +14,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
-	"github.com/GyeongHoKim/gerrit-mcp-server/internal/config"
 	"github.com/GyeongHoKim/gerrit-mcp-server/internal/version"
 )
 
@@ -93,6 +93,16 @@ func (e *APIError) Error() string {
 	return message
 }
 
+// errorMatcher is the shape errors.Is looks for on a wrapped error.
+//
+// It is matched by shape, never by name, so a signature that drifted would
+// silently disable every errors.Is in the codebase rather than failing to
+// compile. The assertion below pins it.
+type errorMatcher interface{ Is(error) bool }
+
+//nolint:errcheck // check-blank reads the assertion as a discarded error; there is no call here
+var _ errorMatcher = (*APIError)(nil)
+
 // Is maps the HTTP status onto the package's sentinel errors so that callers
 // can write errors.Is(err, gerrit.ErrNotFound) instead of comparing numbers.
 func (e *APIError) Is(target error) bool {
@@ -109,16 +119,43 @@ type Client struct {
 	token      string
 }
 
-// New returns a client for the host in cfg.
+// Options describes the host a [Client] talks to and the account it talks as.
 //
-// cfg is expected to have come from [config.Load], which has already rejected
-// a missing host or credentials.
-func New(cfg config.Config) *Client {
+// A struct rather than four parameters: User and Token are both strings, and
+// nothing in the type system would catch them being handed over the wrong way
+// round.
+type Options struct {
+	// BaseURL is the Gerrit host, without a trailing slash. It must be
+	// absolute and carry no query or fragment -- endpoint concatenates onto it.
+	BaseURL *url.URL
+	// User is the Gerrit account name used for HTTP Basic auth.
+	User string
+	// Token is the auth token from that account's HTTP Credentials page.
+	Token string
+	// Timeout bounds a single request. Zero selects [DefaultTimeout].
+	Timeout time.Duration
+}
+
+// DefaultTimeout bounds a request whose [Options] did not choose a timeout.
+//
+// A client is a network client; leaving http.Client's own zero value in place
+// would make an unreachable host hang the tool call rather than fail it.
+const DefaultTimeout = 30 * time.Second
+
+// New returns a client for the host in opts.
+//
+// The caller is responsible for the validation: this package takes the host
+// and credentials as given rather than knowing where they came from.
+func New(opts Options) *Client {
+	if opts.Timeout <= 0 {
+		opts.Timeout = DefaultTimeout
+	}
+
 	return &Client{
-		baseURL:    cfg.BaseURL,
-		httpClient: &http.Client{Timeout: cfg.Timeout},
-		user:       cfg.User,
-		token:      cfg.Token,
+		baseURL:    opts.BaseURL,
+		httpClient: &http.Client{Timeout: opts.Timeout},
+		user:       opts.User,
+		token:      opts.Token,
 	}
 }
 

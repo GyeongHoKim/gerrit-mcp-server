@@ -13,7 +13,6 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/GyeongHoKim/gerrit-mcp-server/internal/config"
 	"github.com/GyeongHoKim/gerrit-mcp-server/internal/gerrit"
 )
 
@@ -29,7 +28,7 @@ func newWritableServerAgainst(t *testing.T, handler http.HandlerFunc) *mcp.Serve
 		t.Fatalf("parsing stub url: %v", err)
 	}
 
-	return New(gerrit.New(config.Config{
+	return New(gerrit.New(gerrit.Options{
 		BaseURL: base,
 		User:    "alice",
 		Token:   "s3cret",
@@ -513,5 +512,91 @@ func TestCreateChangeTool(t *testing.T) {
 
 	if got := resultText(t, result); !strings.Contains(got, "500") {
 		t.Errorf("output = %q, want it to name the change created", got)
+	}
+}
+
+func TestAbandonChangeTool(t *testing.T) {
+	t.Parallel()
+
+	var (
+		gotMethod string
+		gotPath   string
+		gotBody   map[string]any
+	)
+
+	srv := newWritableServerAgainst(t, func(w http.ResponseWriter, r *http.Request) {
+		gotMethod = r.Method
+		gotPath = r.URL.EscapedPath()
+
+		body, readErr := io.ReadAll(r.Body)
+		if readErr != nil {
+			t.Errorf("reading request body: %v", readErr)
+		}
+
+		if decodeErr := json.Unmarshal(body, &gotBody); decodeErr != nil {
+			t.Errorf("decoding request body %q: %v", body, decodeErr)
+		}
+
+		if _, writeErr := w.Write([]byte(")]}'\n" + `{"_number": 12345, "project": "platform/base",
+		  "branch": "main", "subject": "fix the widget alignment", "status": "ABANDONED"}`)); writeErr != nil {
+			t.Errorf("writing stub response: %v", writeErr)
+		}
+	})
+
+	result := callTool(t, srv, "abandon_change", map[string]any{
+		"change_id": "12345",
+		"message":   "superseded by 12400",
+	})
+
+	if result.IsError {
+		t.Fatalf("abandon_change reported an error: %s", resultText(t, result))
+	}
+
+	if gotMethod != http.MethodPost {
+		t.Errorf("method = %s, want POST", gotMethod)
+	}
+
+	if want := "/a/changes/12345/abandon"; gotPath != want {
+		t.Errorf("path = %q, want %q", gotPath, want)
+	}
+
+	if gotBody["message"] != "superseded by 12400" {
+		t.Errorf("message = %v, want the note forwarded", gotBody["message"])
+	}
+
+	// The agent has to be able to tell which change it just stopped work on,
+	// and the number alone is not what a person reading the session recognises.
+	got := resultText(t, result)
+	for _, want := range []string{"12345", "fix the widget alignment"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("output = %q, want it to name %q", got, want)
+		}
+	}
+}
+
+func TestAbandonChangeToolSurfacesAMergedChangeConflict(t *testing.T) {
+	t.Parallel()
+
+	// rest-api-changes.txt, Abandon Change: "If the change cannot be abandoned
+	// because the change state doesn't allow abandoning of the change, the
+	// response is 409 Conflict and the error message is contained in the
+	// response body." Telling the agent only that it failed would leave it
+	// retrying a merged change forever.
+	srv := newWritableServerAgainst(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusConflict)
+
+		if _, err := io.WriteString(w, "change is merged"); err != nil {
+			t.Errorf("writing stub response: %v", err)
+		}
+	})
+
+	result := callTool(t, srv, "abandon_change", map[string]any{"change_id": "12345"})
+
+	if !result.IsError {
+		t.Fatalf("abandon_change succeeded on a merged change, want the refusal reported")
+	}
+
+	if got := resultText(t, result); !strings.Contains(got, "change is merged") {
+		t.Errorf("output = %q, want Gerrit's explanation to reach the model", got)
 	}
 }

@@ -3,6 +3,7 @@ package gerrit
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -11,6 +12,69 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 )
+
+func TestTimestampRoundTrips(t *testing.T) {
+	t.Parallel()
+
+	// Timestamp embeds time.Time, which promotes an RFC 3339 MarshalJSON. A
+	// type that decodes Gerrit's format and encodes another one is a trap for
+	// whoever first puts a Timestamp in a request body.
+	tests := map[string]string{
+		"gerrit format with nanoseconds":                    `"2026-07-31 06:04:05.000000000"`,
+		"fractional seconds are kept":                       `"2026-07-31 06:04:05.123456789"`,
+		"the zero time is the empty string it decoded from": `""`,
+	}
+
+	for name, raw := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			var decoded Timestamp
+			if err := json.Unmarshal([]byte(raw), &decoded); err != nil {
+				t.Fatalf("Unmarshal(%s) returned an unexpected error: %v", raw, err)
+			}
+
+			encoded, err := json.Marshal(decoded)
+			if err != nil {
+				t.Fatalf("Marshal() returned an unexpected error: %v", err)
+			}
+
+			if diff := cmp.Diff(raw, string(encoded)); diff != "" {
+				t.Errorf("round trip mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestTimestampMarshalsInUTC(t *testing.T) {
+	t.Parallel()
+
+	// Starting from a decoded value would prove nothing: time.Parse returns
+	// UTC, so every value that has been through UnmarshalJSON is already in
+	// the only location that formats correctly. A Timestamp built in Go from
+	// time.Now() is not, and the layout carries no zone to give the mistake
+	// away -- Gerrit reads whatever digits arrive as UTC.
+	kst := time.FixedZone("KST", 9*60*60)
+	local := Timestamp{Time: time.Date(2026, time.July, 31, 15, 4, 5, 0, kst)}
+
+	encoded, err := json.Marshal(local)
+	if err != nil {
+		t.Fatalf("Marshal() returned an unexpected error: %v", err)
+	}
+
+	if want := `"2026-07-31 06:04:05.000000000"`; string(encoded) != want {
+		t.Errorf("encoded = %s, want %s", encoded, want)
+	}
+
+	var decoded Timestamp
+	if err = json.Unmarshal(encoded, &decoded); err != nil {
+		t.Fatalf("Unmarshal(%s) returned an unexpected error: %v", encoded, err)
+	}
+
+	if !decoded.Equal(local.Time) {
+		t.Errorf("instant = %v, want it to survive its own encoder as %v", decoded.Time, local.Time)
+	}
+}
 
 func TestTimestampUnmarshalJSON(t *testing.T) {
 	t.Parallel()
@@ -517,5 +581,37 @@ func TestCommitMessageBugs(t *testing.T) {
 				t.Errorf("Bugs() mismatch (-want +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestChangesSubmittedTogetherReportsAForbiddenSet(t *testing.T) {
+	t.Parallel()
+
+	// rest-api-changes.txt, Changes Submitted Together: "If the
+	// o=NON_VISIBLE_CHANGES query parameter is not passed, then instead of a
+	// SubmittedTogetherInfo entity, the response is a list of changes, or a
+	// 403 response with a message if the set of changes to be submitted with
+	// this change includes changes the caller cannot read."
+	//
+	// We do not pass that option, so a 403 here does not mean "you may not see
+	// this change" -- it means this change does not submit alone and part of
+	// the set is invisible. The status maps to ErrForbidden either way, so the
+	// only thing that distinguishes the two for the model is Gerrit's own
+	// message, which must survive.
+	client := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+
+		if _, err := io.WriteString(w, "change 456 not visible"); err != nil {
+			t.Errorf("writing test response: %v", err)
+		}
+	})
+
+	_, err := client.ChangesSubmittedTogether(t.Context(), "12345")
+	if !errors.Is(err, ErrForbidden) {
+		t.Fatalf("ChangesSubmittedTogether() error = %v, want ErrForbidden", err)
+	}
+
+	if !strings.Contains(err.Error(), "change 456 not visible") {
+		t.Errorf("error = %q, want Gerrit's explanation of which change is hidden", err)
 	}
 }

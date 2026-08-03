@@ -11,6 +11,13 @@ import (
 	"strings"
 )
 
+// SideParent is the [CommentInfo.Side] and [CommentInput.Side] value for a
+// comment against the old file. Gerrit's default, REVISION, is the new one.
+//
+// Which side a comment sits on decides what its line number counts against:
+// line 42 of the old file and line 42 of the new one are different lines.
+const SideParent = "PARENT"
+
 // CommentRange is a character range within a file.
 type CommentRange struct {
 	// StartLine is the first line of the range, counting from one.
@@ -95,6 +102,10 @@ type CommentInput struct {
 	Line int `json:"line,omitempty"`
 	// Unresolved marks the comment as needing an answer. Sent even when false
 	// so the intent is explicit rather than inherited from a Gerrit default.
+	//
+	// Gerrit documents this as defaulting to the value of the in_reply_to
+	// comment, so always sending it means a reply to an unresolved thread
+	// resolves that thread unless the caller says otherwise.
 	Unresolved bool `json:"unresolved"`
 }
 
@@ -257,6 +268,15 @@ func (c *Client) deleteDraft(ctx context.Context, changeID, draftID string, patc
 // a time. A failure part way through leaves the earlier deletions in place --
 // they are already gone -- and reports what happened.
 func (c *Client) DeleteAllDraftComments(ctx context.Context, changeID string) (int, error) {
+	// Trimmed here rather than left to ListDraftComments, which trims its own
+	// local copy: the untrimmed id would still reach deleteDraft below, where
+	// changePath escapes the leading space and Gerrit answers 404 on a change
+	// whose drafts were just listed successfully.
+	changeID = strings.TrimSpace(changeID)
+	if changeID == "" {
+		return 0, ErrEmptyChangeID
+	}
+
 	byFile, err := c.ListDraftComments(ctx, changeID)
 	if err != nil {
 		return 0, err

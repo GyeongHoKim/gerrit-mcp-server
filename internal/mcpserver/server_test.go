@@ -8,7 +8,6 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/GyeongHoKim/gerrit-mcp-server/internal/config"
 	"github.com/GyeongHoKim/gerrit-mcp-server/internal/gerrit"
 	"github.com/GyeongHoKim/gerrit-mcp-server/internal/version"
 )
@@ -23,7 +22,7 @@ func newGerrit(t *testing.T) *gerrit.Client {
 		t.Fatalf("parsing base url: %v", err)
 	}
 
-	return gerrit.New(config.Config{
+	return gerrit.New(gerrit.Options{
 		BaseURL: base,
 		User:    "alice",
 		Token:   "s3cret",
@@ -132,12 +131,12 @@ func TestReadOnlyServerOmitsExactlyTheWriteTools(t *testing.T) {
 		}
 	}
 
-	if extra != len(writeTools) {
-		t.Errorf("writable server adds %d tools, want %d from writeTools", extra, len(writeTools))
+	if wantExtra := len(writeTools()); extra != wantExtra {
+		t.Errorf("writable server adds %d tools, want %d from writeTools", extra, wantExtra)
 	}
 
-	if len(readOnly) != len(readTools) {
-		t.Errorf("read-only server exposes %d tools, want %d from readTools", len(readOnly), len(readTools))
+	if wantRead := len(readTools()); len(readOnly) != wantRead {
+		t.Errorf("read-only server exposes %d tools, want %d from readTools", len(readOnly), wantRead)
 	}
 }
 

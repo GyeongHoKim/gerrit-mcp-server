@@ -6,8 +6,6 @@ import (
 	"io"
 	"net/http"
 	"testing"
-
-	"github.com/google/go-cmp/cmp"
 )
 
 func TestSetTopic(t *testing.T) {
@@ -285,7 +283,7 @@ func TestCreateChange(t *testing.T) {
 		}
 	})
 
-	got, err := client.CreateChange(t.Context(), &ChangeInput{
+	got, err := client.CreateChange(t.Context(), ChangeInput{
 		Project:        "p",
 		Branch:         "main",
 		Subject:        "add the thing",
@@ -313,28 +311,6 @@ func TestCreateChange(t *testing.T) {
 	}
 }
 
-func TestCreateChangeLeavesTheCallersInputAlone(t *testing.T) {
-	t.Parallel()
-
-	client := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
-		if _, err := w.Write([]byte(xssiPrefix + "\n" + `{"_number": 500}`)); err != nil {
-			t.Errorf("writing test response: %v", err)
-		}
-	})
-
-	in := ChangeInput{Project: " p ", Branch: " main ", Subject: " add the thing "}
-
-	if _, err := client.CreateChange(t.Context(), &in); err != nil {
-		t.Fatalf("CreateChange() returned an unexpected error: %v", err)
-	}
-
-	// Trimming is what Gerrit is sent, not an edit of what the caller holds.
-	want := ChangeInput{Project: " p ", Branch: " main ", Subject: " add the thing "}
-	if diff := cmp.Diff(want, in); diff != "" {
-		t.Errorf("CreateChange() modified the caller's input (-want +got):\n%s", diff)
-	}
-}
-
 func TestCreateChangeTrimsWhatItSends(t *testing.T) {
 	t.Parallel()
 
@@ -357,7 +333,7 @@ func TestCreateChangeTrimsWhatItSends(t *testing.T) {
 
 	in := ChangeInput{Project: " p ", Branch: " main ", Subject: " add the thing "}
 
-	if _, err := client.CreateChange(t.Context(), &in); err != nil {
+	if _, err := client.CreateChange(t.Context(), in); err != nil {
 		t.Fatalf("CreateChange() returned an unexpected error: %v", err)
 	}
 
@@ -375,7 +351,7 @@ func TestCreateChangeTrimsWhatItSends(t *testing.T) {
 func TestCreateChangeRequiresProjectBranchAndSubject(t *testing.T) {
 	t.Parallel()
 
-	tests := map[string]*ChangeInput{
+	tests := map[string]ChangeInput{
 		"no project": {Branch: "main", Subject: "s"},
 		"no branch":  {Project: "p", Subject: "s"},
 		"no subject": {Project: "p", Branch: "main"},

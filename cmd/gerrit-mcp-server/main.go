@@ -27,7 +27,7 @@ import (
 )
 
 func main() {
-	if err := run(context.Background(), os.Args[1:], os.Stdout); err != nil {
+	if err := run(context.Background(), os.Args[1:], os.Stdout, os.Stderr); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return
 		}
@@ -39,9 +39,14 @@ func main() {
 
 // run parses arguments and serves the MCP server, returning any error rather
 // than exiting so that it stays testable.
-func run(ctx context.Context, args []string, stdout io.Writer) error {
+//
+// Both writers are injected because which one a message lands on is the single
+// invariant this binary cannot get wrong: stdout is the JSON-RPC channel.
+func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	flags := flag.NewFlagSet("gerrit-mcp-server", flag.ContinueOnError)
-	flags.SetOutput(stdout)
+	// Usage text and parse errors are diagnostics. -version is the one thing
+	// here that belongs on stdout, and it writes there explicitly below.
+	flags.SetOutput(stderr)
 	showVersion := flags.Bool("version", false, "print version information and exit")
 
 	if err := flags.Parse(args); err != nil {
@@ -85,7 +90,14 @@ func serve(ctx context.Context) error {
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	server := mcpserver.New(gerrit.New(cfg), cfg.AllowWrite)
+	client := gerrit.New(gerrit.Options{
+		BaseURL: cfg.BaseURL,
+		User:    cfg.User,
+		Token:   cfg.Token,
+		Timeout: cfg.Timeout,
+	})
+
+	server := mcpserver.New(client, cfg.AllowWrite)
 
 	if err = server.Run(ctx, &mcp.StdioTransport{}); err != nil {
 		return fmt.Errorf("serving over stdio: %w", err)

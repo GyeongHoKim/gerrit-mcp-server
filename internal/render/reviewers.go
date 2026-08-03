@@ -1,7 +1,6 @@
 package render
 
 import (
-	"strconv"
 	"strings"
 
 	"github.com/GyeongHoKim/gerrit-mcp-server/internal/gerrit"
@@ -18,13 +17,7 @@ func Reviewers(suggestions []gerrit.SuggestedReviewerInfo) string {
 
 	var out strings.Builder
 
-	out.WriteString(strconv.Itoa(len(suggestions)))
-	out.WriteString(" suggestion")
-
-	if len(suggestions) != 1 {
-		out.WriteString("s")
-	}
-
+	writeCount(&out, len(suggestions), "suggestion")
 	out.WriteString(".\n\n")
 
 	for i := range suggestions {
@@ -42,13 +35,7 @@ func writeSuggestion(out *strings.Builder, suggestion *gerrit.SuggestedReviewerI
 		out.WriteString("group ")
 		out.WriteString(group.Name)
 		out.WriteString(" (")
-		out.WriteString(strconv.Itoa(suggestion.Count))
-		out.WriteString(" member")
-
-		if suggestion.Count != 1 {
-			out.WriteString("s")
-		}
-
+		writeCount(out, suggestion.Count, "member")
 		out.WriteString(")")
 
 		return

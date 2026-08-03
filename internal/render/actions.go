@@ -71,13 +71,7 @@ func SubmissionReverted(changeID string, reverts *gerrit.RevertSubmissionInfo) s
 	var out strings.Builder
 
 	out.WriteString("Created ")
-	out.WriteString(strconv.Itoa(len(changes)))
-	out.WriteString(" change")
-
-	if len(changes) != 1 {
-		out.WriteString("s")
-	}
-
+	writeCount(&out, len(changes), "change")
 	out.WriteString(" reverting the submission containing ")
 	out.WriteString(changeID)
 	out.WriteString(".\n")
@@ -87,7 +81,14 @@ func SubmissionReverted(changeID string, reverts *gerrit.RevertSubmissionInfo) s
 		writeChange(&out, &changes[i])
 	}
 
-	out.WriteString("\nEvery revert still has to be reviewed and submitted.\n")
+	// The continuation agrees with the count for the same reason the count
+	// does. A submission of one change reverts to one change, and "every
+	// revert" then reads as though Gerrit made more than it did.
+	if len(changes) == 1 {
+		out.WriteString("\nThe revert still has to be reviewed and submitted.\n")
+	} else {
+		out.WriteString("\nEvery revert still has to be reviewed and submitted.\n")
+	}
 
 	return out.String()
 }

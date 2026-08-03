@@ -12,8 +12,8 @@ import (
 // reviewerSections maps Gerrit's reviewer states onto the labels we print, in
 // the order they appear.
 var reviewerSections = []struct{ state, label string }{
-	{state: "REVIEWER", label: "Reviewers"},
-	{state: "CC", label: "CC"},
+	{state: gerrit.StateReviewer, label: "Reviewers"},
+	{state: gerrit.StateCC, label: "CC"},
 }
 
 // ChangeDetail renders one change with its review state.
@@ -148,13 +148,7 @@ func Bugs(bugs []string) string {
 
 	var out strings.Builder
 
-	out.WriteString(strconv.Itoa(len(bugs)))
-	out.WriteString(" issue reference")
-
-	if len(bugs) != 1 {
-		out.WriteString("s")
-	}
-
+	writeCount(&out, len(bugs), "issue reference")
 	out.WriteString(".\n\n")
 
 	for _, bug := range bugs {

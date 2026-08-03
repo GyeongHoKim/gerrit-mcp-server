@@ -437,3 +437,199 @@ func TestDeleteAllDraftCommentsReportsPartialProgress(t *testing.T) {
 		t.Errorf("count = %d, want 1 -- the first deletion is not undone by the second failing", count)
 	}
 }
+
+func TestDeleteAllDraftCommentsTrimsTheChangeID(t *testing.T) {
+	t.Parallel()
+
+	var deleted []string
+
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			if _, err := w.Write([]byte(xssiPrefix + "\n" + `{"src/widget.go": [{"id": "d1"}]}`)); err != nil {
+				t.Errorf("writing test response: %v", err)
+			}
+
+			return
+		}
+
+		deleted = append(deleted, r.URL.EscapedPath())
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	// A change id arrives from model-authored JSON, so a stray space is
+	// plausible. The listing trims its own copy, so only the deletion path
+	// notices -- it would escape the space and 404 a change that plainly exists.
+	count, err := client.DeleteAllDraftComments(t.Context(), "  12345  ")
+	if err != nil {
+		t.Fatalf("DeleteAllDraftComments() returned an unexpected error: %v", err)
+	}
+
+	if count != 1 {
+		t.Errorf("count = %d, want 1", count)
+	}
+
+	want := []string{"/a/changes/12345/revisions/current/drafts/d1"}
+	if diff := cmp.Diff(want, deleted); diff != "" {
+		t.Errorf("deleted drafts mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestDeleteAllDraftCommentsRejectsAnEmptyChangeID(t *testing.T) {
+	t.Parallel()
+
+	client := newTestClient(t, func(_ http.ResponseWriter, r *http.Request) {
+		t.Errorf("unexpected %s %s, want no request for an empty change id", r.Method, r.URL.Path)
+	})
+
+	_, err := client.DeleteAllDraftComments(t.Context(), "   ")
+	if !errors.Is(err, ErrEmptyChangeID) {
+		t.Errorf("err = %v, want ErrEmptyChangeID", err)
+	}
+}
+
+func TestCreateDraftComment(t *testing.T) {
+	t.Parallel()
+
+	var (
+		gotMethod string
+		gotPath   string
+		gotBody   map[string]any
+	)
+
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		gotMethod = r.Method
+		gotPath = r.URL.EscapedPath()
+
+		body, readErr := io.ReadAll(r.Body)
+		if readErr != nil {
+			t.Errorf("reading request body: %v", readErr)
+		}
+
+		if decodeErr := json.Unmarshal(body, &gotBody); decodeErr != nil {
+			t.Errorf("decoding request body %q: %v", body, decodeErr)
+		}
+
+		draft := `{"id": "d1", "line": 42, "message": "extract this", "patch_set": 3,
+		  "side": "PARENT", "in_reply_to": "c2", "unresolved": true,
+		  "updated": "2026-07-31 06:04:05.000000000"}`
+
+		if _, writeErr := w.Write([]byte(xssiPrefix + "\n" + draft)); writeErr != nil {
+			t.Errorf("writing test response: %v", writeErr)
+		}
+	})
+
+	// A slash-bearing triplet, because this endpoint builds its path through
+	// revisionPath and nothing else pinned the escaping for it.
+	got, err := client.CreateDraftComment(t.Context(), "a/b~main~I1", &CommentInput{
+		Path:       "src/widget.go",
+		Side:       SideParent,
+		Message:    "extract this",
+		InReplyTo:  "c2",
+		Line:       42,
+		Unresolved: true,
+	})
+	if err != nil {
+		t.Fatalf("CreateDraftComment() returned an unexpected error: %v", err)
+	}
+
+	// rest-api-changes.txt, Create Draft:
+	// 'PUT /changes/{change-id}/revisions/{revision-id}/drafts'.
+	if gotMethod != http.MethodPut {
+		t.Errorf("method = %s, want PUT", gotMethod)
+	}
+
+	if want := "/a/changes/a%2Fb~main~I1/revisions/current/drafts"; gotPath != want {
+		t.Errorf("path = %q, want %q", gotPath, want)
+	}
+
+	// Field by field against the documented CommentInput entity.
+	wantBody := map[string]any{
+		"path":        "src/widget.go",
+		"side":        "PARENT",
+		"message":     "extract this",
+		"in_reply_to": "c2",
+		"line":        float64(42),
+		"unresolved":  true,
+	}
+
+	if diff := cmp.Diff(wantBody, gotBody); diff != "" {
+		t.Errorf("request body mismatch (-want +got):\n%s", diff)
+	}
+
+	if got.ID != "d1" || got.PatchSet != 3 {
+		t.Errorf("draft = %+v, want id d1 on patch set 3", got)
+	}
+}
+
+func TestCreateDraftCommentAlwaysStatesTheResolvedState(t *testing.T) {
+	t.Parallel()
+
+	var gotBody map[string]any
+
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		body, readErr := io.ReadAll(r.Body)
+		if readErr != nil {
+			t.Errorf("reading request body: %v", readErr)
+		}
+
+		if decodeErr := json.Unmarshal(body, &gotBody); decodeErr != nil {
+			t.Errorf("decoding request body %q: %v", body, decodeErr)
+		}
+
+		if _, writeErr := w.Write([]byte(xssiPrefix + "\n" + `{"id": "d1"}`)); writeErr != nil {
+			t.Errorf("writing test response: %v", writeErr)
+		}
+	})
+
+	_, err := client.CreateDraftComment(t.Context(), "12345", &CommentInput{
+		Path:      "src/widget.go",
+		Message:   "done",
+		InReplyTo: "c2",
+	})
+	if err != nil {
+		t.Fatalf("CreateDraftComment() returned an unexpected error: %v", err)
+	}
+
+	// rest-api-changes.txt, CommentInput: unresolved "will default to false if
+	// the comment is an orphan, or the value of the in_reply_to comment if it
+	// is supplied". Sending it unconditionally overrides that inheritance, so
+	// a reply to an unresolved thread resolves the thread. That is deliberate
+	// -- the caller states the intent rather than inheriting one -- and this
+	// pins it, because the alternative reading is a silent thread closure.
+	unresolved, ok := gotBody["unresolved"]
+	if !ok {
+		t.Fatalf("body = %v, want unresolved sent even when false", gotBody)
+	}
+
+	if unresolved != false {
+		t.Errorf("unresolved = %v, want false", unresolved)
+	}
+}
+
+func TestCreateDraftCommentRejectsEmptyArguments(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		in       *CommentInput
+		want     error
+		changeID string
+	}{
+		"no change":  {changeID: " ", in: &CommentInput{Message: "m", Path: "a.go"}, want: ErrEmptyChangeID},
+		"no message": {changeID: "12345", in: &CommentInput{Message: "  ", Path: "a.go"}, want: ErrEmptyMessage},
+		"no path":    {changeID: "12345", in: &CommentInput{Message: "m", Path: " "}, want: ErrEmptyFilePath},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			client := newTestClient(t, func(_ http.ResponseWriter, _ *http.Request) {
+				t.Error("CreateDraftComment() reached the server, want it to refuse before that")
+			})
+
+			if _, err := client.CreateDraftComment(t.Context(), test.changeID, test.in); !errors.Is(err, test.want) {
+				t.Errorf("CreateDraftComment() error = %v, want %v", err, test.want)
+			}
+		})
+	}
+}

@@ -1,0 +1,6 @@
+Created 1 change reverting the submission containing 12345.
+
+[101] NEW +0/-10 — Revert "first"
+  p ~ main · alice
+
+The revert still has to be reviewed and submitted.
