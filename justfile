@@ -183,5 +183,9 @@ clean:
 
 # ---------------------------------------------------------------- aggregate
 
+# Check the agent skills under skills/ are installable.
+check-skills:
+    node scripts/check-skills.mjs
+
 # Everything CI runs. Keep this identical to the CI job so they cannot drift.
-ci: config-verify fmt-check lint tidy-check test-race vuln
+ci: config-verify fmt-check lint tidy-check test-race vuln check-skills
