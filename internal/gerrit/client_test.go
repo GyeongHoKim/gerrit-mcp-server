@@ -516,3 +516,136 @@ func TestNewDefaultsAZeroTimeout(t *testing.T) {
 		t.Errorf("Timeout = %v, want the caller's 1s to win", chosen.httpClient.Timeout)
 	}
 }
+
+// TestWrappersSurfaceTransportFailures pins that every endpoint wrapper hands
+// a refused request back to the caller as the sentinel behind it.
+//
+// Each of these is one `return nil, err` after the call to do, and each is one
+// keystroke away from swallowing the error and returning the zero value it
+// just declared -- which the caller would read as an empty answer rather than
+// a failed one. An empty comment map means "no comments", not "Gerrit said no".
+func TestWrappersSurfaceTransportFailures(t *testing.T) {
+	t.Parallel()
+
+	calls := map[string]func(context.Context, *Client) error{
+		"AbandonChange": func(ctx context.Context, c *Client) error {
+			_, err := c.AbandonChange(ctx, "12345", "")
+
+			return err
+		},
+		"RevertChange": func(ctx context.Context, c *Client) error {
+			_, err := c.RevertChange(ctx, "12345", "")
+
+			return err
+		},
+		"RevertSubmission": func(ctx context.Context, c *Client) error {
+			_, err := c.RevertSubmission(ctx, "12345", "")
+
+			return err
+		},
+		"CreateChange": func(ctx context.Context, c *Client) error {
+			_, err := c.CreateChange(ctx, ChangeInput{Project: "p", Branch: "main", Subject: "s"})
+
+			return err
+		},
+		"ListComments": func(ctx context.Context, c *Client) error {
+			_, err := c.ListComments(ctx, "12345")
+
+			return err
+		},
+		"ListDraftComments": func(ctx context.Context, c *Client) error {
+			_, err := c.ListDraftComments(ctx, "12345")
+
+			return err
+		},
+		"CreateDraftComment": func(ctx context.Context, c *Client) error {
+			_, err := c.CreateDraftComment(ctx, "12345", &CommentInput{
+				Path:    "src/widget.go",
+				Message: "extract this",
+			})
+
+			return err
+		},
+		"PublishDrafts": func(ctx context.Context, c *Client) error {
+			_, err := c.PublishDrafts(ctx, "12345", "", false)
+
+			return err
+		},
+		// These two look up the drafts before deleting anything, so a refusal
+		// here is the listing being refused -- nothing was deleted yet.
+		"DeleteDraftComment": func(ctx context.Context, c *Client) error {
+			return c.DeleteDraftComment(ctx, "12345", "d1")
+		},
+		"DeleteAllDraftComments": func(ctx context.Context, c *Client) error {
+			_, err := c.DeleteAllDraftComments(ctx, "12345")
+
+			return err
+		},
+		"GetCommitMessage": func(ctx context.Context, c *Client) error {
+			_, err := c.GetCommitMessage(ctx, "12345")
+
+			return err
+		},
+		"ChangesSubmittedTogether": func(ctx context.Context, c *Client) error {
+			_, err := c.ChangesSubmittedTogether(ctx, "12345")
+
+			return err
+		},
+		"GetFileDiff": func(ctx context.Context, c *Client) error {
+			_, err := c.GetFileDiff(ctx, "12345", "src/widget.go")
+
+			return err
+		},
+		"SuggestReviewers": func(ctx context.Context, c *Client) error {
+			_, err := c.SuggestReviewers(ctx, "12345", "", 0)
+
+			return err
+		},
+		"AddReviewer": func(ctx context.Context, c *Client) error {
+			_, err := c.AddReviewer(ctx, "12345", ReviewerInput{Reviewer: "carol@example.com"})
+
+			return err
+		},
+	}
+
+	for name, call := range calls {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			client := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusConflict)
+			})
+
+			if err := call(t.Context(), client); !errors.Is(err, ErrConflict) {
+				t.Errorf("%s() error = %v, want ErrConflict", name, err)
+			}
+		})
+	}
+}
+
+func TestChangesSubmittedTogetherRejectsEmptyID(t *testing.T) {
+	t.Parallel()
+
+	client := newTestClient(t, func(_ http.ResponseWriter, _ *http.Request) {
+		t.Error("ChangesSubmittedTogether() reached the server, want it to refuse before that")
+	})
+
+	if _, err := client.ChangesSubmittedTogether(t.Context(), "  "); !errors.Is(err, ErrEmptyChangeID) {
+		t.Errorf("ChangesSubmittedTogether() error = %v, want ErrEmptyChangeID", err)
+	}
+}
+
+func TestRevertSubmissionRejectsEmptyID(t *testing.T) {
+	t.Parallel()
+
+	client := newTestClient(t, func(_ http.ResponseWriter, _ *http.Request) {
+		t.Error("RevertSubmission() reached the server, want it to refuse before that")
+	})
+
+	// An empty id would otherwise be escaped into the path and reach Gerrit as
+	// a request for a change called "", which answers 404 -- a worse error than
+	// the one the caller actually made.
+	if _, err := client.RevertSubmission(t.Context(), "  ", ""); !errors.Is(err, ErrEmptyChangeID) {
+		t.Errorf("RevertSubmission() error = %v, want ErrEmptyChangeID", err)
+	}
+}
