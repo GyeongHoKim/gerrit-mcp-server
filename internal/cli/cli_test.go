@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -47,6 +48,19 @@ func lookupFrom(env map[string]string) func(string) (string, bool) {
 func runCLI(t *testing.T, handler http.HandlerFunc, args ...string) result {
 	t.Helper()
 
+	return runCLIWith(t, handler, nil, args...)
+}
+
+// runCLIWith is [runCLI] with extra environment layered on top, for the tests
+// that turn writes on.
+func runCLIWith(
+	t *testing.T,
+	handler http.HandlerFunc,
+	extra map[string]string,
+	args ...string,
+) result {
+	t.Helper()
+
 	var requests atomic.Int64
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -60,6 +74,7 @@ func runCLI(t *testing.T, handler http.HandlerFunc, args ...string) result {
 		config.EnvUser:  testUser,
 		config.EnvToken: testToken,
 	}
+	maps.Copy(env, extra)
 
 	var stdout, stderr strings.Builder
 
@@ -78,6 +93,11 @@ func runCLI(t *testing.T, handler http.HandlerFunc, args ...string) result {
 		stderr:   stderr.String(),
 		requests: requests.Load(),
 	}
+}
+
+// allowWrites is the environment that lifts the write gate.
+func allowWrites() map[string]string {
+	return map[string]string{config.EnvAllowWrite: "true"}
 }
 
 // refuse is a stub Gerrit that fails the test if anything reaches it.
@@ -135,7 +155,10 @@ func TestEveryCommandRejectsUnexpectedArguments(t *testing.T) {
 		t.Run(command.Name, func(t *testing.T) {
 			t.Parallel()
 
-			got := runCLI(t, refuse(t), command.Name, "12345")
+			// Writes are allowed here so that the gate is not what stops the
+			// command: this is a test of the argument handling behind it, and
+			// the gate has its own.
+			got := runCLIWith(t, refuse(t), allowWrites(), command.Name, "12345")
 
 			if !errors.Is(got.err, ErrUnexpectedArguments) {
 				t.Errorf("error = %v, want it to match %v", got.err, ErrUnexpectedArguments)
@@ -159,7 +182,7 @@ func TestEveryCommandRejectsAnUnknownFlag(t *testing.T) {
 		t.Run(command.Name, func(t *testing.T) {
 			t.Parallel()
 
-			got := runCLI(t, refuse(t), command.Name, "-nonexistent")
+			got := runCLIWith(t, refuse(t), allowWrites(), command.Name, "-nonexistent")
 
 			if !errors.Is(got.err, ErrUsage) {
 				t.Errorf("error = %v, want it to match %v", got.err, ErrUsage)

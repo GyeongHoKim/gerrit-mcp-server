@@ -114,7 +114,7 @@ func readCommands() []Command {
 // have no MCP tool to correspond to, which is exactly what the parity test in
 // internal/mcpserver asserts about the ones that are.
 func GerritCommands() []Command {
-	return readCommands()
+	return append(readCommands(), writeCommands()...)
 }
 
 // metaCommands are gerrit-cli's own, and run without a Gerrit client.
@@ -158,6 +158,11 @@ func Run(ctx context.Context, args []string, opts Options) error {
 // The gate is checked before the client exists and long before anything is
 // sent, so a mutating command run without the opt-in cannot reach Gerrit at
 // all. That is the CLI's counterpart of never registering the tool.
+//
+// It is also checked before the command parses its own flags, which means a
+// typo in a write command's arguments is reported as a refusal rather than as
+// a bad flag. That is the right way round: without the opt-in the command was
+// never going to run, and the refusal is the one message worth acting on.
 func runGerritCommand(ctx context.Context, command Command, args []string, opts Options) error {
 	cfg, _, err := loadConfig(opts)
 	if err != nil {
