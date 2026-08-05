@@ -69,10 +69,10 @@ func writeCommandHelp(ctx context.Context, deps Deps, name string) error {
 
 	// Usage asked for by name is the answer to the question, not a diagnostic,
 	// so it goes to stdout.
-	asked := deps.Options
+	asked := *deps.Options
 	asked.Stderr = deps.Options.Stdout
 
-	err := command.Run(ctx, Deps{Options: asked}, []string{"-h"})
+	err := command.Run(ctx, Deps{Options: &asked}, []string{"-h"})
 	if err != nil && !errors.Is(err, flag.ErrHelp) {
 		return err
 	}

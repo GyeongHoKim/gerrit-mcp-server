@@ -81,7 +81,7 @@ func runCLIWith(
 	// No ConfigPath and no ReadFile: these tests configure through the
 	// environment, which is the path that must work on a host with no
 	// configuration file at all.
-	err := Run(t.Context(), args, Options{
+	err := Run(t.Context(), args, &Options{
 		Lookup: lookupFrom(env),
 		Stdout: &stdout,
 		Stderr: &stderr,
@@ -212,7 +212,7 @@ func TestHelpDescribesEveryCommand(t *testing.T) {
 
 			var stdout, stderr strings.Builder
 
-			opts := Options{Lookup: lookupFrom(nil), Stdout: &stdout, Stderr: &stderr}
+			opts := &Options{Lookup: lookupFrom(nil), Stdout: &stdout, Stderr: &stderr}
 
 			if err := writeCommandHelp(t.Context(), Deps{Options: opts}, command.Name); err != nil {
 				t.Fatalf("writeCommandHelp(%s) returned an unexpected error: %v", command.Name, err)
@@ -342,7 +342,7 @@ func TestRunReportsAMissingConfiguration(t *testing.T) {
 
 	var stdout, stderr strings.Builder
 
-	err := Run(t.Context(), []string{"query-changes", "-query", "is:open"}, Options{
+	err := Run(t.Context(), []string{"query-changes", "-query", "is:open"}, &Options{
 		Lookup: lookupFrom(nil),
 		Stdout: &stdout,
 		Stderr: &stderr,
@@ -369,7 +369,7 @@ func TestRunReportsAnUnreadableConfigurationFile(t *testing.T) {
 
 	var stdout, stderr strings.Builder
 
-	err := Run(t.Context(), []string{"query-changes"}, Options{
+	err := Run(t.Context(), []string{"query-changes"}, &Options{
 		Lookup:     lookupFrom(nil),
 		ReadFile:   func(string) ([]byte, error) { return []byte(`{"tokn":"typo"}`), nil },
 		Stdout:     &stdout,
@@ -407,22 +407,26 @@ func TestExitCode(t *testing.T) {
 		err  error
 		want int
 	}{
-		"success":                {err: nil, want: ExitOK},
-		"help is not a failure":  {err: flag.ErrHelp, want: ExitOK},
-		"a wrapped help request": {err: fmtErrorf(flag.ErrHelp), want: ExitOK},
-		"unknown command":        {err: ErrUnknownCommand, want: ExitUsage},
-		"leftover arguments":     {err: ErrUnexpectedArguments, want: ExitUsage},
-		"an empty change id":     {err: gerrit.ErrEmptyChangeID, want: ExitUsage},
-		"nothing configured":     {err: config.ErrMissing, want: ExitNotConfigured},
-		"a bad variable":         {err: config.ErrInvalid, want: ExitNotConfigured},
-		"writes not allowed":     {err: ErrWriteNotAllowed, want: ExitNotPermitted},
-		"unauthorized":           {err: gerrit.ErrUnauthorized, want: ExitNotPermitted},
-		"forbidden":              {err: gerrit.ErrForbidden, want: ExitNotPermitted},
-		"no such change":         {err: gerrit.ErrNotFound, want: ExitNotFound},
-		"a conflict":             {err: gerrit.ErrConflict, want: ExitConflict},
-		"a rejected review":      {err: gerrit.ErrReviewRejected, want: ExitConflict},
-		"anything else":          {err: errors.New("the network is gone"), want: ExitFailure},
-		"a response too large":   {err: gerrit.ErrResponseTooLarge, want: ExitFailure},
+		"success":                       {err: nil, want: ExitOK},
+		"help is not a failure":         {err: flag.ErrHelp, want: ExitOK},
+		"a wrapped help request":        {err: fmtErrorf(flag.ErrHelp), want: ExitOK},
+		"unknown command":               {err: ErrUnknownCommand, want: ExitUsage},
+		"leftover arguments":            {err: ErrUnexpectedArguments, want: ExitUsage},
+		"an empty change id":            {err: gerrit.ErrEmptyChangeID, want: ExitUsage},
+		"nothing configured":            {err: config.ErrMissing, want: ExitNotConfigured},
+		"a bad variable":                {err: config.ErrInvalid, want: ExitNotConfigured},
+		"writes not allowed":            {err: ErrWriteNotAllowed, want: ExitNotPermitted},
+		"unauthorized":                  {err: gerrit.ErrUnauthorized, want: ExitNotPermitted},
+		"forbidden":                     {err: gerrit.ErrForbidden, want: ExitNotPermitted},
+		"no such change":                {err: gerrit.ErrNotFound, want: ExitNotFound},
+		"init without a terminal":       {err: ErrNotInteractive, want: ExitUsage},
+		"a configuration already there": {err: ErrConfigExists, want: ExitUsage},
+		"init told nothing":             {err: ErrIncompleteAnswers, want: ExitUsage},
+		"nowhere to put the file":       {err: ErrNoConfigPath, want: ExitNotConfigured},
+		"a conflict":                    {err: gerrit.ErrConflict, want: ExitConflict},
+		"a rejected review":             {err: gerrit.ErrReviewRejected, want: ExitConflict},
+		"anything else":                 {err: errors.New("the network is gone"), want: ExitFailure},
+		"a response too large":          {err: gerrit.ErrResponseTooLarge, want: ExitFailure},
 	}
 
 	for name, test := range tests {
@@ -462,7 +466,7 @@ func TestRunKeepsDiagnosticsOffStdout(t *testing.T) {
 
 			var stdout, stderr strings.Builder
 
-			err := Run(t.Context(), args, Options{
+			err := Run(t.Context(), args, &Options{
 				Lookup: lookupFrom(nil),
 				Stdout: &stdout,
 				Stderr: &stderr,
@@ -491,7 +495,7 @@ func TestRunPassesTheContextThrough(t *testing.T) {
 	server := httptest.NewServer(refuse(t))
 	t.Cleanup(server.Close)
 
-	err := Run(ctx, []string{"query-changes", "-query", "is:open"}, Options{
+	err := Run(ctx, []string{"query-changes", "-query", "is:open"}, &Options{
 		Lookup: lookupFrom(map[string]string{
 			config.EnvURL:   server.URL,
 			config.EnvUser:  testUser,

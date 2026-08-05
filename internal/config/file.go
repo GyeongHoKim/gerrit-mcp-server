@@ -210,6 +210,32 @@ func withFallback(
 	}
 }
 
+// Keys is every variable the configuration reads, in the order a report
+// should list them.
+func Keys() []string {
+	return []string{EnvURL, EnvUser, EnvToken, EnvAllowWrite, EnvTimeout, EnvLogLevel}
+}
+
+// Values reports the value chosen for each key and where it came from, without
+// validating any of it.
+//
+// `gerrit-cli config` needs exactly this, and needs it precisely when [Load]
+// refuses: a report that only worked on a valid configuration would go silent
+// in the one case anyone runs it for.
+func Values(lookup func(string) (string, bool), file *File) (map[string]string, Sources) {
+	sources := make(Sources)
+	layered := withFallback(lookup, file.values(), sources)
+	values := make(map[string]string, len(Keys()))
+
+	for _, key := range Keys() {
+		if raw, ok := layered(key); ok {
+			values[key] = strings.TrimSpace(raw)
+		}
+	}
+
+	return values, sources
+}
+
 // DefaultPath returns gerrit-cli's configuration file path under the OS
 // configuration directory.
 //

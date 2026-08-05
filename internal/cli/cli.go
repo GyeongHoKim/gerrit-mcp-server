@@ -18,6 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"strings"
 
 	"github.com/GyeongHoKim/gerrit-mcp-server/internal/config"
@@ -47,9 +48,19 @@ type Options struct {
 	Lookup func(string) (string, bool)
 	// ReadFile has the signature of os.ReadFile.
 	ReadFile func(string) ([]byte, error)
+	// WriteFile has the signature of os.WriteFile. Only init writes.
+	WriteFile func(string, []byte, fs.FileMode) error
+	// MkdirAll has the signature of os.MkdirAll.
+	MkdirAll func(string, fs.FileMode) error
+	// Rename has the signature of os.Rename.
+	Rename func(string, string) error
+	// Stat has the signature of os.Stat.
+	Stat func(string) (fs.FileInfo, error)
+	// Stdin is where init reads the values it writes.
+	Stdin io.Reader
 	// Stdout receives rendered output and nothing else.
 	Stdout io.Writer
-	// Stderr receives usage, diagnostics and errors.
+	// Stderr receives usage, diagnostics, prompts and errors.
 	Stderr io.Writer
 	// ConfigPath is where the configuration file lives.
 	//
@@ -58,6 +69,9 @@ type Options struct {
 	// is actually required: every command here works from the environment
 	// alone, and refusing to start would break exactly the hosts agents run on.
 	ConfigPath string
+	// Interactive reports a stdin attached to a terminal, which is the only
+	// stdin init will read from unless it is told otherwise.
+	Interactive bool
 }
 
 // Deps is what one command is handed to do its work.
@@ -67,7 +81,7 @@ type Deps struct {
 	// everything in [GerritCommands].
 	Gerrit *gerrit.Client
 	// Options is the injected outside world.
-	Options Options
+	Options *Options
 }
 
 // Command is one gerrit-cli subcommand.
@@ -122,6 +136,8 @@ func metaCommands() []Command {
 	return []Command{
 		helpCommand(),
 		versionCommand(),
+		configCommand(),
+		initCommand(),
 	}
 }
 
@@ -129,7 +145,7 @@ func metaCommands() []Command {
 //
 // The error is returned rather than printed so that main decides both the
 // message and the status; see [ExitCode].
-func Run(ctx context.Context, args []string, opts Options) error {
+func Run(ctx context.Context, args []string, opts *Options) error {
 	if len(args) == 0 {
 		if err := writeHelp(opts.Stderr); err != nil {
 			return err
@@ -163,7 +179,7 @@ func Run(ctx context.Context, args []string, opts Options) error {
 // typo in a write command's arguments is reported as a refusal rather than as
 // a bad flag. That is the right way round: without the opt-in the command was
 // never going to run, and the refusal is the one message worth acting on.
-func runGerritCommand(ctx context.Context, command Command, args []string, opts Options) error {
+func runGerritCommand(ctx context.Context, command Command, args []string, opts *Options) error {
 	cfg, _, err := loadConfig(opts)
 	if err != nil {
 		return err
@@ -185,16 +201,10 @@ func runGerritCommand(ctx context.Context, command Command, args []string, opts 
 
 // loadConfig reads the configuration from the environment and, where there is
 // one to read, the configuration file.
-func loadConfig(opts Options) (config.Config, config.Sources, error) {
-	var file config.File
-
-	if opts.ConfigPath != "" && opts.ReadFile != nil {
-		read, err := config.ReadFile(opts.ReadFile, opts.ConfigPath)
-		if err != nil {
-			return config.Config{}, nil, fmt.Errorf("%w: %w", ErrNotConfigured, err)
-		}
-
-		file = read
+func loadConfig(opts *Options) (config.Config, config.Sources, error) {
+	file, err := readConfigFile(opts)
+	if err != nil {
+		return config.Config{}, nil, err
 	}
 
 	cfg, sources, err := config.LoadWithFile(opts.Lookup, &file)

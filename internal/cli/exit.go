@@ -58,6 +58,13 @@ var exitCodes = []struct {
 	{gerrit.ErrEmptyReviewer, ExitUsage},
 	{gerrit.ErrIncompleteChange, ExitUsage},
 
+	// init's own refusals are all things to do differently, not things to
+	// retry: run it in a terminal, pass -force, answer all three questions.
+	{ErrNotInteractive, ExitUsage},
+	{ErrConfigExists, ExitUsage},
+	{ErrIncompleteAnswers, ExitUsage},
+
+	{ErrNoConfigPath, ExitNotConfigured},
 	{ErrNotConfigured, ExitNotConfigured},
 	{config.ErrMissing, ExitNotConfigured},
 	{config.ErrInvalid, ExitNotConfigured},
