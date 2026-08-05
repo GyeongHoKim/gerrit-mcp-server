@@ -149,6 +149,7 @@ release-snapshot:
 # goreleaser stamped into the binaries, so the two can never disagree.
 npm-build VERSION="": build-all
     node scripts/build-npm-packages.mjs "{{ VERSION }}"
+    node scripts/check-npm-packages.mjs "{{ VERSION }}"
 
 # Pack every npm package into a tarball for inspection.
 npm-pack VERSION="": (npm-build VERSION)
