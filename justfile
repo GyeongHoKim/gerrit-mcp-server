@@ -100,13 +100,27 @@ test:
 test-race:
     go test -race ./...
 
-# Run the tests and write a coverage profile.
+# Run the tests and write a coverage profile. Keep the value attached on Unix,
+# where this is the idiomatic Go flag spelling.
+[unix]
 test-cover:
     go test -coverprofile=coverage.out ./...
 
+# PowerShell/native Windows argument handling in this toolchain can split the
+# suffix of `-coverprofile=coverage.out` into a separate `.out` package
+# argument. Pass the flag value as its own argument instead.
+[windows]
+test-cover:
+    go test -coverprofile coverage.out ./...
+
 # Open the coverage profile in a browser.
+[unix]
 cover-html: test-cover
     go tool cover -html=coverage.out
+
+[windows]
+cover-html: test-cover
+    go tool cover -html coverage.out
 
 # ---------------------------------------------------------------- mcp
 
