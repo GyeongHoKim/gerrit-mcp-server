@@ -56,6 +56,25 @@ func TestStringKeepsTheStampsApart(t *testing.T) {
 	}
 }
 
+// TestStringForNamesTheProgram pins the half of the line String() cannot check:
+// the same stamps are built into two binaries, and gerrit-cli reporting itself
+// as gerrit-mcp-server would send anyone reading the output to the wrong
+// program.
+func TestStringForNamesTheProgram(t *testing.T) {
+	stamp(t, "1.2.3", "abc1234", "2026-08-06T00:00:00Z")
+
+	tests := map[string]string{
+		"gerrit-mcp-server": "gerrit-mcp-server 1.2.3 (commit abc1234, built 2026-08-06T00:00:00Z)",
+		"gerrit-cli":        "gerrit-cli 1.2.3 (commit abc1234, built 2026-08-06T00:00:00Z)",
+	}
+
+	for name, want := range tests {
+		if got := StringFor(name); got != want {
+			t.Errorf("StringFor(%q) = %q, want %q", name, got, want)
+		}
+	}
+}
+
 // TestStringDescribesAnUnstampedBuild pins what a `go build` with no ldflags
 // reports. These defaults are what a contributor running from source sees, and
 // they have to read as "not a release" rather than as a real version.
