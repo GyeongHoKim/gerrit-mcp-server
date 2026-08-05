@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -160,5 +161,52 @@ func TestConfigPathIgnoresABlankOverride(t *testing.T) {
 	got := configPath(lookupFrom(env), func() (string, error) { return "cfg", nil })
 	if want := filepath.Join("cfg", config.DirName, config.FileName); got != want {
 		t.Errorf("configPath() = %q, want %q", got, want)
+	}
+}
+
+// TestInteractiveRecognisesAPipe pins the check init depends on. A regular
+// file and a pipe are both "not a terminal", and reading either as one would
+// let init prompt where nothing can answer.
+func TestInteractiveRecognisesAPipe(t *testing.T) {
+	t.Parallel()
+
+	file, err := os.Create(filepath.Join(t.TempDir(), "stdin"))
+	if err != nil {
+		t.Fatalf("creating the stand-in stdin: %v", err)
+	}
+
+	t.Cleanup(func() {
+		if closeErr := file.Close(); closeErr != nil {
+			t.Errorf("closing the stand-in stdin: %v", closeErr)
+		}
+	})
+
+	if interactive(file) {
+		t.Error("interactive() called a regular file a terminal")
+	}
+}
+
+// TestInteractiveToleratesAnUnusableStdin covers a handle that cannot even be
+// stat'd. Guessing "terminal" there would hand init a stdin it can block on,
+// so the safe answer is the only answer.
+func TestInteractiveToleratesAnUnusableStdin(t *testing.T) {
+	t.Parallel()
+
+	file, err := os.Open(filepath.Join(t.TempDir(), "stdin"))
+	if err == nil {
+		t.Fatalf("opening a file that does not exist succeeded: %v", file)
+	}
+
+	closed, err := os.Create(filepath.Join(t.TempDir(), "closed"))
+	if err != nil {
+		t.Fatalf("creating the stand-in stdin: %v", err)
+	}
+
+	if closeErr := closed.Close(); closeErr != nil {
+		t.Fatalf("closing the stand-in stdin: %v", closeErr)
+	}
+
+	if interactive(closed) {
+		t.Error("interactive() called a closed handle a terminal")
 	}
 }

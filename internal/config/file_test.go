@@ -447,3 +447,69 @@ func pointerTo[T any](t *testing.T, value T) *T {
 
 	return &value
 }
+
+func TestKeys(t *testing.T) {
+	t.Parallel()
+
+	want := []string{
+		config.EnvURL, config.EnvUser, config.EnvToken,
+		config.EnvAllowWrite, config.EnvTimeout, config.EnvLogLevel,
+	}
+
+	if diff := cmp.Diff(want, config.Keys()); diff != "" {
+		t.Errorf("Keys() mismatch (-want +got):\n%s", diff)
+	}
+}
+
+// TestValues covers what `gerrit-cli config` reports, including the case it
+// exists for: a configuration Load would refuse. A report that only worked on a
+// valid one would go silent in the one situation anyone runs it in.
+func TestValues(t *testing.T) {
+	t.Parallel()
+
+	file := config.File{URL: "https://file.example.com", User: "from-file", AllowWrite: pointerTo(t, true)}
+	env := map[string]string{config.EnvUser: "from-env"}
+
+	values, sources := config.Values(lookupFrom(env), &file)
+
+	wantValues := map[string]string{
+		config.EnvURL:        "https://file.example.com",
+		config.EnvUser:       "from-env",
+		config.EnvAllowWrite: "true",
+	}
+
+	if diff := cmp.Diff(wantValues, values); diff != "" {
+		t.Errorf("Values() mismatch (-want +got):\n%s", diff)
+	}
+
+	wantSources := map[string]config.Source{
+		config.EnvURL:        config.SourceFile,
+		config.EnvUser:       config.SourceEnvironment,
+		config.EnvAllowWrite: config.SourceFile,
+		// Never answered, so nothing recorded it and Of reads it as a default.
+		config.EnvToken:   config.SourceDefault,
+		config.EnvTimeout: config.SourceDefault,
+	}
+
+	for key, want := range wantSources {
+		if got := sources.Of(key); got != want {
+			t.Errorf("sources.Of(%s) = %v, want %v", key, got, want)
+		}
+	}
+}
+
+// TestValuesToleratesNoFile pins that the report works on a host that has one
+// only in the environment, which is every container an agent runs in.
+func TestValuesToleratesNoFile(t *testing.T) {
+	t.Parallel()
+
+	values, sources := config.Values(lookupFrom(required()), nil)
+
+	if values[config.EnvURL] != "https://gerrit.example.com" {
+		t.Errorf("Values() = %v, want the environment's url", values)
+	}
+
+	if got := sources.Of(config.EnvURL); got != config.SourceEnvironment {
+		t.Errorf("sources.Of(%s) = %v, want %v", config.EnvURL, got, config.SourceEnvironment)
+	}
+}

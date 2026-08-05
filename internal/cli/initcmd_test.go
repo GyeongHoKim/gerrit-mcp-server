@@ -334,6 +334,202 @@ func TestInitDoesNotEchoTheToken(t *testing.T) {
 	}
 }
 
+// TestInitFlagsReachTheWork drives init through Run, which is the only thing
+// that checks the flags are bound to what actually uses them. Every other init
+// test calls runInit directly and would pass with -force wired to nothing.
+func TestInitFlagsReachTheWork(t *testing.T) {
+	t.Parallel()
+
+	existing := fstest.MapFS{
+		strings.TrimPrefix(testConfigPath, "/"): {Data: []byte(`{"url":"https://old.example.com"}`)},
+	}
+
+	tests := map[string]struct {
+		wantErr     error
+		args        []string
+		interactive bool
+		wantWritten bool
+	}{
+		"force replaces an existing file": {
+			args:        []string{"init", "-force"},
+			interactive: true,
+			wantWritten: true,
+		},
+		"without force it is refused": {
+			args:        []string{"init"},
+			interactive: true,
+			wantErr:     ErrConfigExists,
+		},
+		"non-interactive opens a pipe": {
+			args:        []string{"init", "-non-interactive", "-force"},
+			interactive: false,
+			wantWritten: true,
+		},
+		"a pipe alone is still refused": {
+			args:        []string{"init", "-force"},
+			interactive: false,
+			wantErr:     ErrNotInteractive,
+		},
+		"an unknown flag is rejected": {
+			args:        []string{"init", "-nonexistent"},
+			interactive: true,
+			wantErr:     ErrUsage,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			opts, record, _ := initOptions(t,
+				answers("https://gerrit.example.com", "alice", "s3cret"), existing)
+			opts.Interactive = test.interactive
+
+			err := Run(t.Context(), test.args, opts)
+
+			if test.wantErr != nil && !errors.Is(err, test.wantErr) {
+				t.Errorf("error = %v, want it to match %v", err, test.wantErr)
+			}
+
+			if test.wantErr == nil && err != nil {
+				t.Fatalf("Run(%v) returned an unexpected error: %v", test.args, err)
+			}
+
+			written := strings.Contains(string(record.files[testConfigPath]), "gerrit.example.com")
+			if written != test.wantWritten {
+				t.Errorf("wrote the new configuration = %t, want %t", written, test.wantWritten)
+			}
+		})
+	}
+}
+
+// TestInitReportsAFailedWrite covers the three ways the filesystem can refuse.
+// Each one leaves a different amount behind, and a caller told only "init
+// failed" cannot tell which.
+func TestInitReportsAFailedWrite(t *testing.T) {
+	t.Parallel()
+
+	broken := errors.New("read-only filesystem")
+
+	tests := map[string]struct {
+		breaks func(*Options)
+		want   string
+	}{
+		"the directory cannot be created": {
+			breaks: func(o *Options) {
+				o.MkdirAll = func(string, fs.FileMode) error { return broken }
+			},
+			want: "creating",
+		},
+		"the temporary file cannot be written": {
+			breaks: func(o *Options) {
+				o.WriteFile = func(string, []byte, fs.FileMode) error { return broken }
+			},
+			want: "writing",
+		},
+		"the rename into place fails": {
+			breaks: func(o *Options) {
+				o.Rename = func(string, string) error { return broken }
+			},
+			want: "renaming",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			opts, _, _ := initOptions(t, answers("https://gerrit.example.com", "alice", "s3cret"), nil)
+			test.breaks(opts)
+
+			err := runInit(opts, false, false)
+			if err == nil {
+				t.Fatal("runInit() succeeded on a filesystem that refused, want the failure reported")
+			}
+
+			if !errors.Is(err, broken) {
+				t.Errorf("error = %v, want it to wrap the filesystem's own failure", err)
+			}
+
+			// Naming the stage is what tells the reader whether anything was
+			// left behind.
+			if !strings.Contains(err.Error(), test.want) {
+				t.Errorf("error = %v, want it to say which stage failed (%q)", err, test.want)
+			}
+		})
+	}
+}
+
+// TestInitReportsAnUnreadableStdin covers a stdin that fails rather than ends.
+// EOF is an answer -- an empty one -- but a broken pipe is not, and treating
+// the two alike would report "you gave me nothing" for a terminal that died.
+func TestInitReportsAnUnreadableStdin(t *testing.T) {
+	t.Parallel()
+
+	broken := errors.New("input/output error")
+
+	opts, record, _ := initOptions(t, brokenReader{err: broken}, nil)
+
+	err := runInit(opts, false, false)
+	if !errors.Is(err, broken) {
+		t.Errorf("error = %v, want it to wrap the reader's own failure", err)
+	}
+
+	if len(record.files) != 0 {
+		t.Errorf("init wrote %v, want nothing", record.files)
+	}
+}
+
+// TestInitReportsAnUnwritablePrompt covers a terminal that has gone away
+// between the prompt and the answer.
+func TestInitReportsAnUnwritablePrompt(t *testing.T) {
+	t.Parallel()
+
+	opts, _, _ := initOptions(t, answers("https://gerrit.example.com", "alice", "s3cret"), nil)
+	opts.Stderr = errWriter{}
+
+	err := runInit(opts, false, false)
+	if err == nil {
+		t.Fatal("runInit() succeeded prompting a closed terminal, want the failure reported")
+	}
+
+	if !strings.Contains(err.Error(), "prompt") {
+		t.Errorf("error = %v, want it to name the failed prompt", err)
+	}
+}
+
+// TestInitReportsAnUnwritableConfirmation covers the last write init makes.
+// Reaching it means the file is already on disk, so failing silently here
+// would tell a caller nothing happened when in fact everything did.
+func TestInitReportsAnUnwritableConfirmation(t *testing.T) {
+	t.Parallel()
+
+	opts, record, _ := initOptions(t,
+		answers("https://gerrit.example.com", "alice", "s3cret"), nil)
+
+	// Not interactive, so nothing is prompted and the confirmation is the only
+	// thing this writer ever sees.
+	opts.Interactive = false
+	opts.Stderr = errWriter{}
+
+	err := runInit(opts, false, true)
+	if err == nil {
+		t.Fatal("runInit() succeeded reporting to a closed stderr, want the failure reported")
+	}
+
+	if len(record.files) == 0 {
+		t.Error("the configuration was not written, so this is not the failure under test")
+	}
+}
+
+// brokenReader fails rather than ending, standing in for a terminal that died
+// mid-answer.
+type brokenReader struct{ err error }
+
+func (b brokenReader) Read([]byte) (int, error) {
+	return 0, b.err
+}
+
 func TestInitNeedsSomewhereToPutTheFile(t *testing.T) {
 	t.Parallel()
 

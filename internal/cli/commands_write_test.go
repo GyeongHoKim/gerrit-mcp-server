@@ -2,53 +2,11 @@ package cli
 
 import (
 	"errors"
-	"slices"
 	"strings"
 	"testing"
 
 	"github.com/GyeongHoKim/gerrit-mcp-server/internal/config"
 )
-
-// writeCommandArgs is the smallest invocation of each write command that gets
-// past the argument validation in internal/gerrit and actually dials the host.
-//
-// Spelled out per command so that adding a thirteenth write command without
-// deciding how to call it fails TestEveryWriteCommandIsCovered rather than
-// quietly going untested on the path that matters most.
-func writeCommandArgs() map[string][]string {
-	change := []string{"-" + flagChangeID, "12345"}
-
-	return map[string][]string{
-		"post-review-comment":   append(slices.Clone(change), "-file", "a.go", "-message", "nit"),
-		"publish-drafts":        change,
-		"delete-draft-comment":  append(slices.Clone(change), "-draft-id", "abc123"),
-		"delete-draft-comments": change,
-		"add-reviewer":          append(slices.Clone(change), "-reviewer", "bob"),
-		"set-topic":             append(slices.Clone(change), "-topic", "cleanup"),
-		"set-ready-for-review":  change,
-		"set-work-in-progress":  change,
-		"abandon-change":        change,
-		"revert-change":         change,
-		"revert-submission":     change,
-		"create-change":         {"-project", "platform/base", "-branch", "main", "-subject", "wire it up"},
-	}
-}
-
-func TestEveryWriteCommandIsCovered(t *testing.T) {
-	t.Parallel()
-
-	args := writeCommandArgs()
-
-	for _, command := range writeCommands() {
-		if _, ok := args[command.Name]; !ok {
-			t.Errorf("%s has no entry in writeCommandArgs; add one so the write gate is tested", command.Name)
-		}
-	}
-
-	if len(args) != len(writeCommands()) {
-		t.Errorf("writeCommandArgs has %d entries for %d write commands", len(args), len(writeCommands()))
-	}
-}
 
 // TestWriteCommandsNeverReachGerritWithoutTheOptIn is the test that costs
 // something. The MCP server enforces this by not registering the tool at all;
@@ -58,13 +16,11 @@ func TestEveryWriteCommandIsCovered(t *testing.T) {
 func TestWriteCommandsNeverReachGerritWithoutTheOptIn(t *testing.T) {
 	t.Parallel()
 
-	args := writeCommandArgs()
-
 	for _, command := range writeCommands() {
 		t.Run(command.Name, func(t *testing.T) {
 			t.Parallel()
 
-			got := runCLI(t, refuse(t), append([]string{command.Name}, args[command.Name]...)...)
+			got := runCLI(t, refuse(t), invocation(command.Name)...)
 
 			if !errors.Is(got.err, ErrWriteNotAllowed) {
 				t.Errorf("error = %v, want it to match %v", got.err, ErrWriteNotAllowed)
@@ -92,14 +48,11 @@ func TestWriteCommandsNeverReachGerritWithoutTheOptIn(t *testing.T) {
 func TestWriteCommandsRunWithTheOptIn(t *testing.T) {
 	t.Parallel()
 
-	args := writeCommandArgs()
-
 	for _, command := range writeCommands() {
 		t.Run(command.Name, func(t *testing.T) {
 			t.Parallel()
 
-			got := runCLIWith(t, serveJSON(t, "{}"), allowWrites(),
-				append([]string{command.Name}, args[command.Name]...)...)
+			got := runCLIWith(t, serveJSON(t, "{}"), allowWrites(), invocation(command.Name)...)
 
 			if errors.Is(got.err, ErrWriteNotAllowed) {
 				t.Errorf("%s was refused with %s set", command.Name, config.EnvAllowWrite)

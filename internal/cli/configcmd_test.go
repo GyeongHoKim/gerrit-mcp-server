@@ -163,6 +163,78 @@ func TestConfigCommandSurvivesAnUnreadableFile(t *testing.T) {
 	}
 }
 
+// TestConfigCommandReportsAHostWithNowhereToLook covers the container an agent
+// runs in: no HOME, no %AppData%, so no path to report. The environment alone
+// is still a complete configuration, so the report has to say so rather than
+// refuse.
+func TestConfigCommandReportsAHostWithNowhereToLook(t *testing.T) {
+	t.Parallel()
+
+	var stdout, stderr strings.Builder
+
+	opts := &Options{
+		Lookup: lookupFrom(map[string]string{
+			config.EnvURL:   "https://gerrit.example.com",
+			config.EnvUser:  "alice",
+			config.EnvToken: "s3cret",
+		}),
+		Stdout: &stdout,
+		Stderr: &stderr,
+	}
+
+	if err := writeConfigReport(opts); err != nil {
+		t.Fatalf("writeConfigReport() returned an unexpected error: %v", err)
+	}
+
+	if !strings.Contains(stdout.String(), "none") {
+		t.Errorf("the report does not say there is no file location:\n%s", stdout.String())
+	}
+
+	// Nothing is missing, so there is no advice to give.
+	if strings.Contains(stdout.String(), ProgramName+" init") {
+		t.Errorf("the report tells a configured host to run init:\n%s", stdout.String())
+	}
+}
+
+// TestConfigCommandWithoutAStatReportsTheFileAsAbsent covers a caller that
+// injected no Stat. There is no way to tell whether the file is there, and
+// claiming it is would be a guess.
+func TestConfigCommandWithoutAStatReportsTheFileAsAbsent(t *testing.T) {
+	t.Parallel()
+
+	opts, stdout := reportOptions(t, nil, "")
+	opts.Stat = nil
+
+	if err := writeConfigReport(opts); err != nil {
+		t.Fatalf("writeConfigReport() returned an unexpected error: %v", err)
+	}
+
+	if !strings.Contains(stdout.String(), "not created yet") {
+		t.Errorf("the report claims to know the file is there:\n%s", stdout.String())
+	}
+}
+
+// TestConfigCommandLinesUpALongValue covers the column padding. A value wider
+// than the column must still leave a space before its source, or the two run
+// together into something unreadable.
+func TestConfigCommandLinesUpALongValue(t *testing.T) {
+	t.Parallel()
+
+	const long = "https://gerrit.a-rather-long-hostname.example.com/review"
+
+	opts, stdout := reportOptions(t, map[string]string{config.EnvURL: long}, "")
+
+	if err := writeConfigReport(opts); err != nil {
+		t.Fatalf("writeConfigReport() returned an unexpected error: %v", err)
+	}
+
+	line := lineFor(t, stdout.String(), config.EnvURL)
+
+	if !strings.Contains(line, long+" (") {
+		t.Errorf("the long value runs into its source: %q", line)
+	}
+}
+
 // lineFor returns the reported line for one variable.
 func lineFor(t *testing.T, report, key string) string {
 	t.Helper()
