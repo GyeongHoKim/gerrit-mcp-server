@@ -1,8 +1,10 @@
 #!/usr/bin/env node
-// Locates the binary for the current platform and hands control to it.
+// Locates the gerrit-cli binary for the current platform and hands control to
+// it.
 //
-// This process sits between an MCP client and a JSON-RPC server, so stdout is
-// reserved for the protocol. Everything this wrapper says goes to stderr.
+// stdio is inherited, so the binary's own discipline applies unchanged:
+// rendered output on stdout, everything else on stderr. Anything this wrapper
+// has to say is a diagnostic, so it goes to stderr.
 
 import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
@@ -12,9 +14,9 @@ const require = createRequire(import.meta.url);
 // Kept in sync with scripts/platforms.mjs. It is duplicated rather than
 // imported because this file ships on its own inside the published package.
 //
-// The same five packages back @gyeonghokim/gerrit-cli: one platform package
-// carries both binaries, so a second frontend costs one wrapper rather than
-// five more packages.
+// The packages are named after the server, not after this CLI: one platform
+// package carries both binaries, so there is no @gyeonghokim/gerrit-cli-linux-x64
+// and there should not be one.
 const PACKAGES = {
   "linux-x64": "@gyeonghokim/gerrit-mcp-server-linux-x64",
   "linux-arm64": "@gyeonghokim/gerrit-mcp-server-linux-arm64",
@@ -24,7 +26,7 @@ const PACKAGES = {
 };
 
 function fail(message) {
-  process.stderr.write(`gerrit-mcp-server: ${message}\n`);
+  process.stderr.write(`gerrit-cli: ${message}\n`);
   process.exit(1);
 }
 
@@ -35,11 +37,11 @@ if (packageName === undefined) {
   fail(
     `unsupported platform ${target}. ` +
       `Supported platforms are ${Object.keys(PACKAGES).join(", ")}. ` +
-      `Build from source instead: go install github.com/GyeongHoKim/gerrit-mcp-server/cmd/gerrit-mcp-server@latest`,
+      `Build from source instead: go install github.com/GyeongHoKim/gerrit-mcp-server/cmd/gerrit-cli@latest`,
   );
 }
 
-const binary = process.platform === "win32" ? "gerrit-mcp-server.exe" : "gerrit-mcp-server";
+const binary = process.platform === "win32" ? "gerrit-cli.exe" : "gerrit-cli";
 
 let executable;
 try {
