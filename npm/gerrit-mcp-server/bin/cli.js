@@ -11,6 +11,10 @@ const require = createRequire(import.meta.url);
 
 // Kept in sync with scripts/platforms.mjs. It is duplicated rather than
 // imported because this file ships on its own inside the published package.
+//
+// The same five packages back @gyeonghokim/gerrit-cli: one platform package
+// carries both binaries, so a second frontend costs one wrapper rather than
+// five more packages.
 const PACKAGES = {
   "linux-x64": "@gyeonghokim/gerrit-mcp-server-linux-x64",
   "linux-arm64": "@gyeonghokim/gerrit-mcp-server-linux-arm64",

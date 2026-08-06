@@ -226,6 +226,10 @@ linters:
         - errors.Join(
         - .Wrap(
         - .Wrapf(
+        # gerrit-cli's own entry point, called only from its main. What it
+        # returns is already the sentence the user reads; wrapping it there
+        # would put a stutter in front of every message the binary prints.
+        - cli.Run(
 
   exclusions:
     generated: strict

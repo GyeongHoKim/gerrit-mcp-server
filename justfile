@@ -14,6 +14,12 @@ EXT := if os() == "windows" { ".exe" } else { "" }
 OUT := "bin" / BIN + EXT
 PKG := "./cmd/gerrit-mcp-server"
 
+# The second frontend. Same packages underneath, a command line instead of a
+# protocol, and both ship inside the same npm platform packages.
+CLI := "gerrit-cli"
+CLI_OUT := "bin" / CLI + EXT
+CLI_PKG := "./cmd/gerrit-cli"
+
 # Release builds get their stamps from goreleaser; local builds report "dev"
 # unless these are exported, which keeps the recipe free of shell-specific
 # git plumbing.
@@ -44,13 +50,18 @@ install-hooks:
 
 # ---------------------------------------------------------------- build
 
-# Build the server into bin/.
+# Build both binaries into bin/.
 build:
     go build -ldflags "{{ LDFLAGS }}" -o "{{ OUT }}" "{{ PKG }}"
+    go build -ldflags "{{ LDFLAGS }}" -o "{{ CLI_OUT }}" "{{ CLI_PKG }}"
 
 # Run the server straight from source. Speaks JSON-RPC on stdin/stdout.
 run *ARGS:
     go run "{{ PKG }}" {{ ARGS }}
+
+# Run the command-line client straight from source.
+run-cli *ARGS:
+    go run "{{ CLI_PKG }}" {{ ARGS }}
 
 # Cross-compile every release target without publishing anything.
 build-all:
@@ -138,6 +149,7 @@ release-snapshot:
 # goreleaser stamped into the binaries, so the two can never disagree.
 npm-build VERSION="": build-all
     node scripts/build-npm-packages.mjs "{{ VERSION }}"
+    node scripts/check-npm-packages.mjs "{{ VERSION }}"
 
 # Pack every npm package into a tarball for inspection.
 npm-pack VERSION="": (npm-build VERSION)
@@ -171,5 +183,9 @@ clean:
 
 # ---------------------------------------------------------------- aggregate
 
+# Check the agent skills under skills/ are installable.
+check-skills:
+    node scripts/check-skills.mjs
+
 # Everything CI runs. Keep this identical to the CI job so they cannot drift.
-ci: config-verify fmt-check lint tidy-check test-race vuln
+ci: config-verify fmt-check lint tidy-check test-race vuln check-skills

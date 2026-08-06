@@ -5,25 +5,78 @@
 [![Go](https://img.shields.io/badge/go-1.26-00ADD8)](https://go.dev)
 [![License](https://img.shields.io/badge/license-Elastic--2.0-005571)](LICENSE)
 
-A [Model Context Protocol](https://modelcontextprotocol.io) server that connects your AI coding
-agent to Gerrit code review.
+Connect your AI coding agent to Gerrit code review.
 
 Ask your agent to find the changes waiting on you, read a diff, draft line comments, and publish a
 review — without leaving the session and without pasting change numbers back and forth.
 
-It speaks MCP over **stdio**, so it works with any MCP client: Claude Code, Codex, Cursor, Zed,
-Continue, or your own. It is a single static binary with no runtime dependencies. You self-host it;
-nothing is sent anywhere except to the Gerrit host you configure.
+It ships as **two frontends over the same code**, so you can pick how much of your agent's context
+you want to spend:
+
+| | What it is | Context cost |
+| --- | --- | --- |
+| **`gerrit-cli` + skill** | A command-line binary, plus an [agent skill](skills/gerrit-cli/SKILL.md) that teaches an agent to drive it | One line, until the skill triggers |
+| **`gerrit-mcp-server`** | A [Model Context Protocol](https://modelcontextprotocol.io) server over **stdio** | 22 tool schemas, for the whole session |
+
+The skill route is the lighter one and works with any agent that reads skills. The MCP server needs
+no shell access and works with any MCP client: Claude Code, Codex, Cursor, Zed, Continue, or your
+own.
+
+Either way it is a single static binary with no runtime dependencies. You self-host it; nothing is
+sent anywhere except to the Gerrit host you configure.
 
 ## Quick start
 
-You need Node installed only so that `npx` can fetch and run the right binary for your machine. The
-server itself is Go and has no Node runtime dependency.
+Both routes start the same way.
 
-**1. Create a Gerrit auth token.** In Gerrit, go to *Settings → HTTP Credentials* and generate one.
-See [Authentication](#authentication) below if your Gerrit is older.
+**Create a Gerrit auth token.** In Gerrit, go to *Settings → HTTP Credentials* and generate one.
+See [Credentials](#credentials) below if your Gerrit is older.
 
-**2. Add the server to your MCP client.**
+Node is needed only so that `npm` or `npx` can fetch the right binary for your machine. The binaries
+are Go and have no Node runtime dependency.
+
+### Route A — `gerrit-cli` + agent skill
+
+The lighter one. Nothing sits in your agent's context until it needs Gerrit.
+
+**1. Install the binary.**
+
+```bash
+npm i -g @gyeonghokim/gerrit-cli
+```
+
+**2. Install the skill.** This works for Claude Code, Codex, Cursor and many others.
+
+```bash
+npx skills add GyeongHoKim/gerrit-mcp-server
+```
+
+**3. Configure it.** Run this yourself in a terminal — it asks for your token on stdin, and will
+refuse to run where nothing can type into it.
+
+```bash
+gerrit-cli init
+```
+
+**4. Check it.** `gerrit-cli config` reports every setting and where it came from, naming anything
+still missing. Then ask your agent: *"What changes am I reviewing?"*
+
+To allow the commands that modify Gerrit, set `GERRIT_ALLOW_WRITE=true` — see
+[Available tools and commands](#available-tools-and-commands).
+
+You can also use the CLI on its own, without an agent:
+
+```bash
+gerrit-cli query-changes --query "is:open reviewer:self -owner:self"
+gerrit-cli get-file-diff --change-id 12345 --file src/main.go
+gerrit-cli help
+```
+
+### Route B — MCP server
+
+No shell access needed, and it works with any MCP client.
+
+**Add the server to your client.**
 
 <details open>
 <summary><b>Claude Code</b></summary>
@@ -91,40 +144,87 @@ Add this to the client's MCP configuration file:
 
 </details>
 
-**3. Ask for something.** "What changes am I reviewing?" or "Summarise the diff on change 12345."
+**Ask for something.** "What changes am I reviewing?" or "Summarise the diff on change 12345."
 
-## Authentication
+## Credentials
 
 Gerrit authenticates REST clients with HTTP Basic using a token from your account settings, and
-expects authenticated requests to be prefixed with `/a/`. This server handles the prefix for you.
+expects authenticated requests to be prefixed with `/a/`. Both binaries handle the prefix for you.
 
 Generate a token under *Settings → HTTP Credentials*. On Gerrit 3.13 and newer you can name the
 token and give it a lifetime (`90 days`, `1 year`, and so on) — worth doing, so the credential this
-server holds is scoped and expires on its own.
+holds is scoped and expires on its own. Older Gerrit versions call the same thing an *HTTP
+password*; it still works, as that endpoint is now an alias that creates a token with the id
+`legacy`.
 
-Older Gerrit versions call the same thing an *HTTP password*. It still works: that endpoint is now
-an alias that creates a token with the id `legacy`.
+**Where the token lives depends on which frontend you use.**
 
-The token is sent in an `Authorization` header. It never appears in a command line, a log line, or
-an error message.
+`gerrit-mcp-server` reads the environment and only the environment, so its credentials live in your
+MCP client's config file and nowhere else. It never reads a file of its own.
+
+`gerrit-cli` has no client config to inherit from, so `gerrit-cli init` writes one under the OS
+configuration directory:
+
+| OS | Path |
+| --- | --- |
+| Linux | `$XDG_CONFIG_HOME/gerrit-cli/config.json`, or `~/.config/gerrit-cli/config.json` |
+| macOS | `~/Library/Application Support/gerrit-cli/config.json` |
+| Windows | `%AppData%\gerrit-cli\config.json` |
+
+Set `GERRIT_CONFIG` to put it somewhere else. Environment variables always take precedence over the
+file, so a one-off `GERRIT_TOKEN=... gerrit-cli ...` works and CI never needs a file at all.
+`gerrit-cli config` prints where each value actually came from.
+
+What holds for both:
+
+- **The token only ever travels in an `Authorization` header.** It is never passed as a process
+  argument, so it cannot be read out of `ps`, and it is never written to a log line or an error
+  message. `gerrit-cli init` has no `--token` flag for exactly this reason.
+- **Nothing goes anywhere but your Gerrit host.**
+
+What is worth knowing about the file:
+
+- On Linux and macOS it is written `0600`, readable only by you. On Windows it inherits the ACL of
+  `%AppData%`, which is already restricted to your account plus SYSTEM and Administrators — setting
+  a tighter one needs a dependency this project does not take. If your `%AppData%` is redirected to
+  a network share, prefer keeping `GERRIT_TOKEN` in your environment instead.
+- **`gerrit-cli init` echoes the token as you type it.** Hiding terminal input needs a dependency
+  this project does not take either. Pipe it in if that matters:
+  `printf 'https://gerrit.example.com
+alice
+%s
+' "$TOKEN" | gerrit-cli init -non-interactive`
+- **Do not commit it, and do not commit an MCP config either.** A project-level `.mcp.json` holding
+  `GERRIT_TOKEN` is a credential in your repository. Keep it in your user-level client config, or
+  gitignore it.
+- **Use a dedicated token with a lifetime**, so it can be revoked without touching your other
+  credentials.
+- Your Gerrit permissions still apply. Neither frontend can see or do anything your account cannot.
 
 ## Configuration
 
-All configuration is environment variables, so it lives in your MCP client config and nowhere else.
+Both frontends read the same variables. For the MCP server they live in your client's config; for
+the CLI they are optional, since `gerrit-cli init` writes the same settings to a file.
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
 | `GERRIT_URL` | yes | — | Base URL of the Gerrit host, for example `https://gerrit.example.com` |
 | `GERRIT_USER` | yes | — | Your Gerrit username |
 | `GERRIT_TOKEN` | yes | — | Auth token from *Settings → HTTP Credentials* |
-| `GERRIT_ALLOW_WRITE` | no | `false` | Set to `true` to register the tools that modify Gerrit |
+| `GERRIT_ALLOW_WRITE` | no | `false` | Set to `true` to enable the tools and commands that modify Gerrit |
 | `GERRIT_TIMEOUT` | no | `30s` | Per-request timeout |
 | `GERRIT_LOG_LEVEL` | no | `info` | `debug`, `info`, `warn`, or `error`. Logs go to stderr |
+| `GERRIT_CONFIG` | no | — | `gerrit-cli` only. Path to the configuration file, overriding the default |
 
-## Available tools
+## Available tools and commands
 
-Read-only tools are always registered. **Write tools are off unless you set
-`GERRIT_ALLOW_WRITE=true`**, so an agent cannot abandon a change or post a review by accident.
+**The two frontends expose exactly the same set**, and a test in the repository holds them there.
+A CLI command is its MCP tool name with the underscores written as dashes — `query_changes` becomes
+`query-changes` — and `gerrit-cli` accepts either spelling.
+
+Reads are always available. **Writes are off unless you set `GERRIT_ALLOW_WRITE=true`**, so an
+agent cannot abandon a change or post a review by accident. The MCP server does not register the
+write tools at all; `gerrit-cli` still lists them in its help, marked, but refuses to run one.
 
 ### Read
 
@@ -140,6 +240,12 @@ Read-only tools are always registered. **Write tools are off unless you set
 | `changes_submitted_together` | Changes that would submit alongside this one |
 | `suggest_reviewers` | Reviewer suggestions for a change |
 | `get_bugs_from_cl` | Bug ids referenced in the commit message |
+
+Every value is a flag; `gerrit-cli` has no positional arguments. Run `gerrit-cli help <command>`
+for one command's flags — that is authoritative and cannot go stale.
+
+There is deliberately **no `--json` output**. Everything passes through the same renderer that keeps
+responses inside a sensible token budget, and handing an agent raw Gerrit JSON would undo that.
 
 ### Write — requires `GERRIT_ALLOW_WRITE=true`
 
@@ -158,16 +264,20 @@ Read-only tools are always registered. **Write tools are off unless you set
 | `revert_change` | Revert a change |
 | `revert_submission` | Revert a whole submission |
 
-## Security
+## Exit codes
 
-- **The token stays in a header.** It is never passed as a process argument, so it cannot be read
-  out of `ps`, and it is never written to logs.
-- **Read-only by default.** Destructive tools are not registered unless you opt in.
-- **Don't commit your MCP config.** A project-level `.mcp.json` with `GERRIT_TOKEN` in it is a
-  credential in your repository. Keep it in your user-level client config, or gitignore it.
-- **Use a dedicated token** with a lifetime, so it can be revoked without touching your other
-  credentials.
-- Your Gerrit permissions still apply. This server cannot see or do anything your account cannot.
+`gerrit-cli` reports what to do about a failure, not just that one happened. Rendered output goes to
+stdout and everything else to stderr, so the answer is safe to pipe.
+
+| Code | Meaning |
+| --- | --- |
+| 0 | Success |
+| 1 | Something else failed; read stderr |
+| 2 | Bad arguments |
+| 3 | Not configured — run `gerrit-cli init` |
+| 4 | Not permitted — the account, or `GERRIT_ALLOW_WRITE` |
+| 5 | No such change, file or comment |
+| 6 | The change is not in a state that allows this |
 
 ## Supported Gerrit versions
 
@@ -176,16 +286,18 @@ newer**; older versions are missing some of the draft comment endpoints.
 
 ## Other ways to install
 
-`npx` is the easy path, but the binary stands alone.
+`npm` is the easy path, but the binaries stand alone.
 
 ```bash
 # Go toolchain
 go install github.com/GyeongHoKim/gerrit-mcp-server/cmd/gerrit-mcp-server@latest
+go install github.com/GyeongHoKim/gerrit-mcp-server/cmd/gerrit-cli@latest
 ```
 
-Or download a binary for your platform from the
-[releases page](https://github.com/GyeongHoKim/gerrit-mcp-server/releases) and point your MCP
-client's `command` at it directly. No Node required.
+Or download the archive for your platform from the
+[releases page](https://github.com/GyeongHoKim/gerrit-mcp-server/releases). It contains both
+binaries and the agent skill, and you can point your MCP client's `command` straight at
+`gerrit-mcp-server`. No Node required.
 
 ## Development
 

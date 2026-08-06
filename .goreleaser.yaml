@@ -40,6 +40,35 @@ builds:
       - goos: windows
         goarch: arm64
 
+  # The command-line frontend. Same matrix, same stamps, and it lands in the
+  # same archive and the same npm platform packages as the server.
+  #
+  # scripts/build-npm-packages.mjs matches artifacts on this id. Without it,
+  # two builds per target would leave the manifest ambiguous and whichever
+  # binary goreleaser listed first would be shipped as both.
+  - id: gerrit-cli
+    main: ./cmd/gerrit-cli
+    binary: gerrit-cli
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X github.com/GyeongHoKim/gerrit-mcp-server/internal/version.Version={{ .Version }}
+      - -X github.com/GyeongHoKim/gerrit-mcp-server/internal/version.Commit={{ .FullCommit }}
+      - -X github.com/GyeongHoKim/gerrit-mcp-server/internal/version.Date={{ .Date }}
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+
 archives:
   - id: default
     formats:
@@ -53,6 +82,9 @@ archives:
     files:
       - LICENSE
       - README.md
+      # Whoever downloads a tarball instead of installing from npm should get
+      # the agent skill too; otherwise it is an npm-only feature by accident.
+      - skills/**/*
 
 checksum:
   name_template: checksums.txt

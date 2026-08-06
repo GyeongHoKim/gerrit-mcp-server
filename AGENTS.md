@@ -5,12 +5,23 @@ Working notes for agents and humans changing this repository. For what the produ
 
 ## What this is
 
-A Go binary that speaks Model Context Protocol over stdio and talks to a Gerrit host over its REST
-API. Distributed on npm so that `npx -y @gyeonghokim/gerrit-mcp-server` just works.
+Two Go binaries over one Gerrit REST client, distributed together on npm.
 
-**The process speaks JSON-RPC on stdout.** Never print to stdout. Not a debug line, not a progress
-message, not a stray `fmt.Println`. Anything that is not protocol traffic corrupts the stream and
-the client disconnects. Diagnostics go to stderr.
+- **`gerrit-mcp-server`** speaks Model Context Protocol over stdio.
+- **`gerrit-cli`** is a command line, driven by an agent skill in `skills/`. It exists because an
+  MCP server's tool schemas sit in a model's context for a whole session, and a skill costs one
+  line until it triggers.
+
+They expose the same 22 operations from the same packages, and `internal/mcpserver/parity_test.go`
+holds them to that.
+
+**Stdout means different things in the two binaries, and getting it wrong is fatal in one of them.**
+
+- `cmd/gerrit-mcp-server` speaks JSON-RPC on stdout. **Never print to stdout there.** Not a debug
+  line, not a progress message, not a stray `fmt.Println`. Anything that is not protocol traffic
+  corrupts the stream and the client disconnects. Diagnostics go to stderr.
+- `cmd/gerrit-cli` prints rendered output on stdout and everything else -- usage, prompts,
+  diagnostics, errors -- on stderr, so the answer stays pipeable.
 
 ## Setup
 
@@ -29,8 +40,9 @@ Always go through `just`. The recipes carry the right flags and CI runs the same
 
 | Command | What it does |
 | --- | --- |
-| `just build` | Build into `bin/` |
-| `just run` | Run from source |
+| `just build` | Build both binaries into `bin/` |
+| `just run` | Run the MCP server from source |
+| `just run-cli` | Run gerrit-cli from source |
 | `just test` / `just test-race` | Tests, with and without the race detector |
 | `just lint` / `just lint-fix` | Linters |
 | `just fmt` / `just fmt-check` | Formatters |
@@ -39,25 +51,34 @@ Always go through `just`. The recipes carry the right flags and CI runs the same
 | `just vuln` | govulncheck |
 | `just inspect` | Drive the server through the MCP Inspector |
 | `just ci` | Everything CI runs |
+| `just check-skills` | Fail if a skill under `skills/` is not installable |
 | `just fetch-gerrit-docs` | Refetch the Gerrit REST reference into `doc/` |
-| `just npm-smoke 1.2.3` | Build, pack and install the npm packages, then run the binary |
+| `just npm-smoke` | Build, pack and install the npm packages, then run both binaries |
+
+Run `just npm-smoke` without a version. Passing one sets the npm package version but not the stamp
+goreleaser compiled in, and the smoke test compares the two.
 
 ## Layout
 
 ```
-cmd/gerrit-mcp-server/   entry point: flags, environment, wiring
-internal/config/         environment parsing and validation
+cmd/gerrit-mcp-server/   MCP entry point: flags, environment, wiring
+cmd/gerrit-cli/          CLI entry point: the same, plus the filesystem and a terminal
+internal/config/         environment and file parsing, and validation
 internal/gerrit/         the REST client -- HTTP lives here and nowhere else
-internal/render/         Gerrit types to the compact text the model reads
+internal/render/         Gerrit types to the compact text a caller reads
 internal/mcpserver/      tool definitions and registration
+internal/cli/            command definitions, dispatch, exit codes, init
 internal/version/        ldflags-injected build stamps
-npm/                     published wrapper package (bin/cli.js dispatches by platform)
+npm/<wrapper>/           published wrapper packages (bin/cli.js dispatches by platform)
+skills/<skill>/          agent skills, installed with `npx skills add`
 scripts/                 release plumbing, all Node so it runs on every OS
 doc/                     fetched Gerrit REST reference (gitignored)
 ```
 
-`internal/gerrit` must not import `internal/mcpserver`. HTTP concerns stay on one side of that line
-and protocol concerns on the other.
+`internal/gerrit` must not import `internal/mcpserver` or `internal/cli`. HTTP concerns stay on one
+side of that line and frontend concerns on the other. The two frontends do not import each other
+either -- the one exception is `internal/mcpserver/parity_test.go`, which imports `internal/cli` on
+purpose so the inventory contract lives next to the list it defends.
 
 ## Conventions
 
@@ -73,8 +94,18 @@ argument validation next to the call it guards -- so callers can use `errors.Is`
 Everything the model sees goes through `internal/render`, which compacts it. Tokens
 are a budget.
 
-**Write tools are opt-in.** Anything that mutates Gerrit is registered only when
-`GERRIT_ALLOW_WRITE` is set. Adding a mutating tool to the read-only set is a bug.
+**Write tools are opt-in, and the two frontends enforce that differently.** `internal/mcpserver`
+does not register a write tool at all without `GERRIT_ALLOW_WRITE`, because a model cannot call a
+tool it cannot see. `internal/cli` still lists its write commands in `gerrit-cli help`, marked, and
+refuses to run one -- a caller there can type any string, so hiding them would only teach a reader
+the feature does not exist when the answer is one variable away. Both check before a client is
+built, so nothing reaches Gerrit. Adding a mutating operation to either read set is a bug, and
+`internal/mcpserver/parity_test.go` is what catches it.
+
+**A new operation lands in both frontends or in neither.** `readTools`/`writeTools` in
+`internal/mcpserver/server.go` and `readCommands`/`writeCommands` in `internal/cli/cli.go` are
+functions rather than package-level slices for the same reason: a var could be appended to from
+anywhere in the package.
 
 ## Gerrit API notes
 
@@ -104,8 +135,11 @@ fix(gerrit): strip xssi prefix before decoding
 ```
 
 A **scope is required**, and is free-form and lower-case — say which part of the system moved.
-Scopes already in use: `gerrit`, `mcp`, `tools`, `config`, `auth`, `npm`, `release`, `ci`, `deps`,
-`lint`, `docs`. Reach for one of those before inventing a synonym.
+Scopes already in use: `gerrit`, `mcp`, `cli`, `tools`, `config`, `auth`, `npm`, `release`, `ci`,
+`deps`, `lint`, `docs`, `skill`. Reach for one of those before inventing a synonym.
+
+commitlint reads any body line starting `word:` as a footer, and then objects that it has no blank
+line before it. Reflow rather than fighting it.
 
 Allowed **types** are a fixed list in `commitlint.config.mjs`; add to that enum rather than working
 around it. Subject is lower-case, no trailing period, 72 characters for the whole header.
@@ -119,6 +153,12 @@ Do not use `--no-verify`. If a hook is wrong, fix the hook.
 - `internal/render`: golden files written by hand, not captured with `-update`. A golden taken from
   the implementation records only what the code happens to do.
 - `internal/mcpserver`: tools driven over an in-memory transport against a stub Gerrit.
+- `internal/cli`: commands driven end to end -- flags, client, renderer, stdout -- against the same
+  kind of stub. No new golden files; `internal/render` already goldens every function, and the CLI
+  tests assert which renderer was called rather than what it emits.
+- The filesystem and the terminal are injected through `cli.Options`, never reached for. That is
+  what makes `TestInitNeverReadsStdinWithoutATerminal` possible, and that test is the reason `init`
+  is shaped the way it is.
 - Tests run with `-race` in CI on Linux, macOS and Windows.
 
 ## Releasing
@@ -133,5 +173,18 @@ The tag is the only version source — nothing in git carries a real version num
 `NPM_TOKEN` in the release workflow: if npm sees one it silently uses the legacy token path instead
 of OIDC.
 
-Adding a platform means touching `scripts/platforms.mjs`, `.goreleaser.yaml`, `npm/bin/cli.js`, and
-registering a trusted publisher for the new package on npmjs.com.
+**Seven packages go out**: five platform packages, each carrying both binaries, plus one wrapper
+per frontend. Every one of them needs its own trusted publisher on npmjs.com naming the workflow
+*filename* `release.yml`. There is no token fallback, so a package that is not configured fails the
+publish outright -- after goreleaser has already cut the GitHub release and the earlier packages are
+already up, which is a release nobody can install and nobody can redo. Configure the publisher
+before tagging. `scripts/check-npm-packages.mjs` catches what it can before the first publish, but
+it cannot see whether a trusted publisher exists.
+
+Adding a platform means touching `scripts/platforms.mjs`, `.goreleaser.yaml`, the `PACKAGES` table
+in **every** `npm/*/bin/cli.js`, and registering a trusted publisher for the new package.
+
+Adding a frontend means a second `builds:` entry in `.goreleaser.yaml`, an entry in `BINARIES` and
+`WRAPPERS`, a new `npm/<name>/` source tree, a publish step in `release.yml`, and one more trusted
+publisher. `findBinary` in `scripts/build-npm-packages.mjs` matches artifacts on the goreleaser
+build id precisely because more than one build now produces a binary per target.

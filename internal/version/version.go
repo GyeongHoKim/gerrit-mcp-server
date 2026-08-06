@@ -15,7 +15,20 @@ var (
 	Date = "unknown"
 )
 
-// String renders the build information as a single human-readable line.
+// ServerName is the program name gerrit-mcp-server reports.
+const ServerName = "gerrit-mcp-server"
+
+// StringFor renders the build information for the named program as a single
+// human-readable line.
+//
+// The name is a parameter because two binaries are built from these stamps and
+// a binary that reports another program's name is a binary nobody can file a
+// useful bug against.
+func StringFor(name string) string {
+	return fmt.Sprintf("%s %s (commit %s, built %s)", name, Version, Commit, Date)
+}
+
+// String renders the build information for gerrit-mcp-server.
 func String() string {
-	return fmt.Sprintf("gerrit-mcp-server %s (commit %s, built %s)", Version, Commit, Date)
+	return StringFor(ServerName)
 }
