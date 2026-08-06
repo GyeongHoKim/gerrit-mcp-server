@@ -54,12 +54,22 @@ func TestWriteCommandsRunWithTheOptIn(t *testing.T) {
 
 			got := runCLIWith(t, serveJSON(t, "{}"), allowWrites(), invocation(command.Name)...)
 
-			if errors.Is(got.err, ErrWriteNotAllowed) {
-				t.Errorf("%s was refused with %s set", command.Name, config.EnvAllowWrite)
+			// Not merely "not refused": with the opt-in set the command has to
+			// run all the way through, so a gate that opened onto a broken call
+			// still fails here.
+			if got.err != nil {
+				t.Fatalf("%s returned an unexpected error: %v", command.Name, got.err)
 			}
 
 			if got.requests == 0 {
 				t.Errorf("%s never reached gerrit, want the command to have run", command.Name)
+			}
+
+			// Every write command renders its result, and stdout is where a
+			// caller pipes it from. What it says is internal/render's contract
+			// and is goldened there; that it says anything at all is this one.
+			if got.stdout == "" {
+				t.Errorf("%s wrote nothing to stdout, want the rendered result", command.Name)
 			}
 		})
 	}
