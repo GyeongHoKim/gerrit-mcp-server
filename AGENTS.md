@@ -60,7 +60,7 @@ goreleaser compiled in, and the smoke test compares the two.
 
 ## Layout
 
-```
+```text
 cmd/gerrit-mcp-server/   MCP entry point: flags, environment, wiring
 cmd/gerrit-cli/          CLI entry point: the same, plus the filesystem and a terminal
 internal/config/         environment and file parsing, and validation
@@ -129,7 +129,7 @@ reference is the AsciiDoc in `doc/` — run `just fetch-gerrit-docs` to get it.
 Conventional Commits, enforced by commitlint in the `commit-msg` hook and again in CI — bypassing
 the hook locally only defers the failure.
 
-```
+```text
 feat(tools): add list_draft_comments
 fix(gerrit): strip xssi prefix before decoding
 ```
