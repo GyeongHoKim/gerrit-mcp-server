@@ -125,6 +125,12 @@ func TestReadFileRejects(t *testing.T) {
 		// error arrives as "GERRIT_TOKEN: not set", which sends the reader to
 		// the environment to fix a mistake that is in a file.
 		"a misspelled key": {body: `{"tokn":"s3cret"}`, want: "parsing"},
+		// Two objects, presumably one edit that went wrong. Decoding stops at
+		// the end of the first, so accepting this would apply half a file.
+		"two top-level objects": {
+			body: `{"url":"https://gerrit.example.com"}{"user":"alice"}`,
+			want: "parsing",
+		},
 	}
 
 	for name, test := range tests {

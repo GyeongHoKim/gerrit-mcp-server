@@ -5,11 +5,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"path/filepath"
 	"strconv"
 	"strings"
 )
+
+// errTrailingContent reports a configuration file with more than one top-level
+// JSON value in it.
+var errTrailingContent = errors.New("the file holds more than one json value")
 
 // EnvConfigPath overrides where gerrit-cli looks for its configuration file.
 //
@@ -157,7 +162,19 @@ func ReadFile(read func(string) ([]byte, error), path string) (File, error) {
 		return File{}, fmt.Errorf("parsing %s: %w", path, err)
 	}
 
-	return file, nil
+	// Decode stops at the end of the first value, so a file holding two of them
+	// would silently apply the first and drop the second. Which one won would be
+	// an accident of the parser rather than a decision anyone made.
+	var rest json.RawMessage
+
+	switch err = decoder.Decode(&rest); {
+	case errors.Is(err, io.EOF):
+		return file, nil
+	case err != nil:
+		return File{}, fmt.Errorf("parsing %s: %w", path, err)
+	default:
+		return File{}, fmt.Errorf("parsing %s: %w", path, errTrailingContent)
+	}
 }
 
 // LoadWithFile reads and validates the configuration, filling anything the
