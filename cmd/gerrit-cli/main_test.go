@@ -23,14 +23,19 @@ func lookupFrom(env map[string]string) func(string) (string, bool) {
 // blankConfiguration empties the variables a developer's own shell is likely
 // to have set, so that a test of the unconfigured path does not accidentally
 // find a real Gerrit.
+//
+// GERRIT_CONFIG is pointed at a file that does not exist rather than blanked:
+// configPath reads a blank override as absent and falls back to the OS
+// configuration directory, which on a developer's machine is a real
+// configuration this test would then read.
 func blankConfiguration(t *testing.T) {
 	t.Helper()
 
-	for _, key := range []string{
-		config.EnvURL, config.EnvUser, config.EnvToken, config.EnvConfigPath,
-	} {
+	for _, key := range []string{config.EnvURL, config.EnvUser, config.EnvToken} {
 		t.Setenv(key, "")
 	}
+
+	t.Setenv(config.EnvConfigPath, filepath.Join(t.TempDir(), config.FileName))
 }
 
 func TestRunPrintsTheVersionOnStdout(t *testing.T) {
