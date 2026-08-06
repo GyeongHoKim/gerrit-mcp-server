@@ -197,11 +197,6 @@ func TestInteractiveRecognisesAPipe(t *testing.T) {
 func TestInteractiveToleratesAnUnusableStdin(t *testing.T) {
 	t.Parallel()
 
-	file, err := os.Open(filepath.Join(t.TempDir(), "stdin"))
-	if err == nil {
-		t.Fatalf("opening a file that does not exist succeeded: %v", file)
-	}
-
 	closed, err := os.Create(filepath.Join(t.TempDir(), "closed"))
 	if err != nil {
 		t.Fatalf("creating the stand-in stdin: %v", err)
