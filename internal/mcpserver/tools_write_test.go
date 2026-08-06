@@ -600,3 +600,143 @@ func TestAbandonChangeToolSurfacesAMergedChangeConflict(t *testing.T) {
 		t.Errorf("output = %q, want Gerrit's explanation to reach the model", got)
 	}
 }
+
+// TestWriteToolsReportGerritFailures pins what each write tool says when Gerrit
+// refuses.
+//
+// It matters more here than on the read side: a mutating tool that fails
+// ambiguously invites an agent to retry an action that may already have taken
+// effect. Each case asserts on that handler's own wrapping prefix, so a tool
+// reporting another tool's operation fails even though both are error results.
+func TestWriteToolsReportGerritFailures(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		args   map[string]any
+		want   string
+		status int
+	}{
+		"publish_drafts": {
+			args:   map[string]any{"change_id": "12345"},
+			status: http.StatusConflict,
+			want:   "publishing drafts on 12345",
+		},
+		// A draft someone already discarded from the web UI is gone; the id the
+		// model is holding refers to nothing.
+		"delete_draft_comment": {
+			args:   map[string]any{"change_id": "12345", "draft_id": "d1"},
+			status: http.StatusNotFound,
+			want:   "discarding draft d1 on 12345",
+		},
+		"delete_draft_comments": {
+			args:   map[string]any{"change_id": "12345"},
+			status: http.StatusNotFound,
+			want:   "discarding drafts on 12345 after removing 0",
+		},
+		"add_reviewer": {
+			args:   map[string]any{"change_id": "12345", "reviewer": "carol@example.com"},
+			status: http.StatusForbidden,
+			want:   "adding carol@example.com to 12345",
+		},
+		"set_topic": {
+			args:   map[string]any{"change_id": "12345", "topic": "cleanup"},
+			status: http.StatusConflict,
+			want:   "setting the topic on 12345",
+		},
+		"set_ready_for_review": {
+			args:   map[string]any{"change_id": "12345"},
+			status: http.StatusConflict,
+			want:   "marking 12345 ready for review",
+		},
+		"set_work_in_progress": {
+			args:   map[string]any{"change_id": "12345"},
+			status: http.StatusConflict,
+			want:   "marking 12345 work-in-progress",
+		},
+		// Gerrit refuses to revert a change that was never merged.
+		"revert_change": {
+			args:   map[string]any{"change_id": "12345"},
+			status: http.StatusConflict,
+			want:   "reverting 12345",
+		},
+		"revert_submission": {
+			args:   map[string]any{"change_id": "12345"},
+			status: http.StatusConflict,
+			want:   "reverting the submission containing 12345",
+		},
+		// Opening a change needs push rights on the target project.
+		"create_change": {
+			args:   map[string]any{"project": "p", "branch": "main", "subject": "add the thing"},
+			status: http.StatusForbidden,
+			want:   "creating a change on p",
+		},
+	}
+
+	for tool, tc := range cases {
+		t.Run(tool, func(t *testing.T) {
+			t.Parallel()
+
+			srv := newWritableServerAgainst(t, func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(tc.status)
+			})
+
+			result := callTool(t, srv, tool, tc.args)
+
+			if !result.IsError {
+				t.Fatalf("%s succeeded, want the Gerrit refusal reported as a tool error", tool)
+			}
+
+			got := resultText(t, result)
+
+			if !strings.Contains(got, tc.want) {
+				t.Errorf("error text = %q, want it to mention %q", got, tc.want)
+			}
+
+			if !strings.Contains(got, http.StatusText(tc.status)) {
+				t.Errorf("error text = %q, want it to carry the %d status", got, tc.status)
+			}
+		})
+	}
+}
+
+func TestDeleteDraftCommentsToolReportsHowFarItGot(t *testing.T) {
+	t.Parallel()
+
+	// Gerrit has no bulk delete, so this walks the drafts one at a time and a
+	// failure part way through cannot be undone. Reporting only the failure
+	// would leave an agent believing its drafts are still there.
+	const drafts = `{
+	  "src/a.go": [{"id": "d1", "line": 1, "message": "one", "patch_set": 2}],
+	  "src/b.go": [{"id": "d2", "line": 2, "message": "two", "patch_set": 2}]
+	}`
+
+	srv := newWritableServerAgainst(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			if _, err := w.Write([]byte(")]}'\n" + drafts)); err != nil {
+				t.Errorf("writing stub response: %v", err)
+			}
+
+			return
+		}
+
+		// The first delete lands; the second is refused. Files are walked in
+		// sorted order, so src/a.go goes before src/b.go.
+		if strings.HasSuffix(r.URL.EscapedPath(), "/d2") {
+			w.WriteHeader(http.StatusConflict)
+
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	result := callTool(t, srv, "delete_draft_comments", map[string]any{"change_id": "12345"})
+
+	if !result.IsError {
+		t.Fatal("delete_draft_comments succeeded, want the partial failure reported")
+	}
+
+	if got := resultText(t, result); !strings.Contains(got, "after removing 1") {
+		t.Errorf("error text = %q, want it to say one draft was already deleted", got)
+	}
+}

@@ -1,14 +1,26 @@
-// The single source of truth for which platforms we ship.
+// The single source of truth for which platforms we ship, and which binaries
+// go in them.
 //
 // Adding a platform here is not enough on its own: the goos/goarch pair must
-// also be produced by .goreleaser.yaml, the npm name must be listed in
-// npm/bin/cli.js, and the new package needs its own trusted publisher on
-// npmjs.com before the release workflow can push it.
+// also be produced by .goreleaser.yaml, the npm name must be listed in the
+// PACKAGES table inside *every* npm/*/bin/cli.js, and the new package needs its
+// own trusted publisher on npmjs.com before the release workflow can push it.
 
 import path from "node:path";
 
 export const SCOPE = "@gyeonghokim";
 export const NAME = "gerrit-mcp-server";
+export const CLI_NAME = "gerrit-cli";
+
+/**
+ * The binaries inside every platform package, by goreleaser build id.
+ *
+ * Two frontends ship as two executables in one platform package rather than as
+ * two sets of platform packages: the second frontend then costs one wrapper
+ * instead of five more packages, five more trusted publishers on npmjs.com and
+ * five more things to keep in step.
+ */
+export const BINARIES = [NAME, CLI_NAME];
 
 /** @type {{npm: string, goos: string, goarch: string, os: string, cpu: string}[]} */
 export const PLATFORMS = [
@@ -19,17 +31,34 @@ export const PLATFORMS = [
   { npm: "win32-x64", goos: "windows", goarch: "amd64", os: "win32", cpu: "x64" },
 ];
 
-/** The wrapper package users actually install. */
+/** The wrapper package for the MCP server. */
 export const WRAPPER = `${SCOPE}/${NAME}`;
 
-/** The package name for a platform entry. */
+/**
+ * The wrapper packages users install, one per frontend.
+ *
+ * Both resolve to the same five platform packages. `dir` is the source tree
+ * under npm/ and the output directory under dist/npm/; `binary` is which of
+ * BINARIES that wrapper runs.
+ */
+export const WRAPPERS = [
+  { name: `${SCOPE}/${NAME}`, dir: NAME, binary: NAME },
+  { name: `${SCOPE}/${CLI_NAME}`, dir: CLI_NAME, binary: CLI_NAME },
+];
+
+/**
+ * The package name for a platform entry.
+ *
+ * Platform packages are named after the server even though they carry both
+ * binaries. Renaming them would orphan every installed wrapper that pins them.
+ */
 export function packageName(platform) {
   return `${SCOPE}/${NAME}-${platform.npm}`;
 }
 
-/** The binary filename inside a platform package. */
-export function binaryName(platform) {
-  return platform.os === "win32" ? `${NAME}.exe` : NAME;
+/** The filename of one binary inside a platform package. */
+export function binaryName(platform, binary) {
+  return platform.os === "win32" ? `${binary}.exe` : binary;
 }
 
 /** Strip a leading "v" so git tags and npm versions agree. */

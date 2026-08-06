@@ -236,6 +236,14 @@ func TestLoadInvalid(t *testing.T) {
 			wantCause:    config.ErrInvalid,
 			wantMentions: []string{config.EnvURL},
 		},
+		// The scheme is fine and url.Parse is happy; there is simply no
+		// authority. Every request built on it would go to a relative path
+		// and fail somewhere much further from the cause than here.
+		"url with a scheme but no host": {
+			env:          with(map[string]string{config.EnvURL: "https:///gerrit"}),
+			wantCause:    config.ErrInvalid,
+			wantMentions: []string{config.EnvURL},
+		},
 		"url carrying a fragment": {
 			env:          with(map[string]string{config.EnvURL: "https://gerrit.example.com/#/q/status:open"}),
 			wantCause:    config.ErrInvalid,

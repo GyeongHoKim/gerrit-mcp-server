@@ -1,8 +1,14 @@
-// Package config loads the server's configuration from the environment.
+// Package config loads the configuration for both frontends.
 //
-// Everything is configured with environment variables so that it lives in the
-// MCP client's config file and nowhere else -- there is no config file of our
-// own for a token to leak into.
+// gerrit-mcp-server is configured with environment variables alone, so its
+// credentials live in the MCP client's config and nowhere else: [Load] never
+// touches a disk. gerrit-cli has no client config to inherit from, so it also
+// reads a JSON file under the OS configuration directory -- see [LoadWithFile].
+//
+// The environment always wins over the file, and it wins by layering at the
+// lookup rather than by merging two Configs, so a value read from a file goes
+// through the same parser, the same validation and the same error message an
+// environment variable does. There is one parser here, not two.
 package config
 
 import (

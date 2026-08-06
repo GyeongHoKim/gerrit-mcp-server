@@ -1,0 +1,25 @@
+# Defaults for nektos/act, which runs .github/workflows in Docker. Only lines
+# starting with a dash are read as arguments, so the rest of this is comment.
+#
+#   act pull_request -j quality    # exactly what `just ci` runs, on a Linux runner
+#   act pull_request -j test
+#
+# act otherwise picks a runner image interactively on first use and remembers
+# the choice in ~/.actrc, which makes the image a property of whoever ran it.
+# Pinning it here keeps every checkout on the same one, and this image carries
+# the tooling jdx/mise-action expects to install onto.
+-P ubuntu-latest=catthehacker/ubuntu:act-latest
+
+# macos-latest and windows-latest are deliberately left unmapped, because
+# mapping them at a Linux image would report a pass for a platform that never
+# ran. The test matrix has three entries for a reason: several recipes have
+# separate [unix] and [windows] bodies, and the Windows branch of `clean` is
+# what that third entry exists to exercise.
+#
+# Note what act does with them: it prints "Skipping unsupported platform" and
+# still exits 0. A green act run means Linux passed and says nothing at all
+# about the other two -- only CI covers those.
+
+# jdx/mise-action@v4 runs on node24. act 0.2.78 rejects that outright ("runs.using
+# key in action.yml must be one of ... got node24") and never reaches the
+# workflow; 0.2.89 runs it.

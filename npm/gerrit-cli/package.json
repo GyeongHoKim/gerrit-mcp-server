@@ -1,0 +1,37 @@
+{
+  "name": "@gyeonghokim/gerrit-cli",
+  "version": "0.0.0",
+  "description": "Command-line client for Gerrit code review, and the binary behind the gerrit-cli agent skill.",
+  "license": "Elastic-2.0",
+  "author": "GyeongHoKim",
+  "type": "module",
+  "bin": {
+    "gerrit-cli": "bin/cli.js"
+  },
+  "files": [
+    "bin/",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "gerrit",
+    "cli",
+    "code-review",
+    "agent",
+    "skill",
+    "ai",
+    "llm"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GyeongHoKim/gerrit-mcp-server.git"
+  },
+  "homepage": "https://github.com/GyeongHoKim/gerrit-mcp-server#readme",
+  "bugs": {
+    "url": "https://github.com/GyeongHoKim/gerrit-mcp-server/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "optionalDependencies": {}
+}

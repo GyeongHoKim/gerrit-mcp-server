@@ -18,6 +18,14 @@ func TestReviewers(t *testing.T) {
 			{Group: &gerrit.GroupBaseInfo{ID: "6a1e70e1", Name: "reviewers-core"}, Count: 12},
 			{Group: &gerrit.GroupBaseInfo{ID: "abc", Name: "solo-group"}, Count: 1},
 		},
+		// A suggestion carrying neither an account nor a group. Gerrit should
+		// never send one, but rendering it as an empty line would leave the
+		// count disagreeing with the list under it, which reads as a bug in
+		// the counting rather than as something odd from the server.
+		"reviewers_unknown": {
+			{Account: &gerrit.AccountInfo{Name: "Bob Brown", AccountID: 2}},
+			{},
+		},
 	}
 
 	for name, suggestions := range tests {

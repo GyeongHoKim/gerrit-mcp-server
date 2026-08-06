@@ -558,3 +558,96 @@ func TestGetBugsFromCLTool(t *testing.T) {
 		t.Errorf("output treats the Change-Id as a bug:\n%s", got)
 	}
 }
+
+// TestReadToolsReportGerritFailures pins what each read tool says when Gerrit
+// refuses.
+//
+// The wrapping message is the only thing the model has to go on when a call
+// fails, so each case asserts on that handler's own prefix rather than merely
+// that something went wrong. A tool that started reporting another tool's
+// operation would still be an error result, and would still be a bug.
+func TestReadToolsReportGerritFailures(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		args   map[string]any
+		want   string
+		status int
+	}{
+		"get_change_details": {
+			args:   map[string]any{"change_id": "12345"},
+			status: http.StatusNotFound,
+			want:   "fetching change 12345",
+		},
+		"get_commit_message": {
+			args:   map[string]any{"change_id": "12345"},
+			status: http.StatusNotFound,
+			want:   "fetching commit message for 12345",
+		},
+		"list_change_files": {
+			args:   map[string]any{"change_id": "12345"},
+			status: http.StatusNotFound,
+			want:   "listing files for 12345",
+		},
+		"get_file_diff": {
+			args:   map[string]any{"change_id": "12345", "file": "src/widget.go"},
+			status: http.StatusNotFound,
+			want:   "fetching diff of src/widget.go in 12345",
+		},
+		"list_change_comments": {
+			args:   map[string]any{"change_id": "12345"},
+			status: http.StatusForbidden,
+			want:   "listing comments on 12345",
+		},
+		// Draft endpoints are the ones that move between Gerrit versions, so a
+		// 404 here is the realistic failure rather than a contrived one.
+		"list_draft_comments": {
+			args:   map[string]any{"change_id": "12345"},
+			status: http.StatusNotFound,
+			want:   "listing draft comments on 12345",
+		},
+		"changes_submitted_together": {
+			args:   map[string]any{"change_id": "12345"},
+			status: http.StatusNotFound,
+			want:   "computing changes submitted with 12345",
+		},
+		"suggest_reviewers": {
+			args:   map[string]any{"change_id": "12345", "query": "bo"},
+			status: http.StatusForbidden,
+			want:   "suggesting reviewers for 12345",
+		},
+		"get_bugs_from_cl": {
+			args:   map[string]any{"change_id": "12345"},
+			status: http.StatusNotFound,
+			want:   "fetching commit message for 12345",
+		},
+	}
+
+	for tool, tc := range cases {
+		t.Run(tool, func(t *testing.T) {
+			t.Parallel()
+
+			srv := newServerAgainst(t, func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(tc.status)
+			})
+
+			result := callTool(t, srv, tool, tc.args)
+
+			if !result.IsError {
+				t.Fatalf("%s succeeded, want the Gerrit refusal reported as a tool error", tool)
+			}
+
+			got := resultText(t, result)
+
+			if !strings.Contains(got, tc.want) {
+				t.Errorf("error text = %q, want it to mention %q", got, tc.want)
+			}
+
+			// The status has to survive too: "fetching change 12345" alone does
+			// not tell the model whether to retry or to give up.
+			if !strings.Contains(got, http.StatusText(tc.status)) {
+				t.Errorf("error text = %q, want it to carry the %d status", got, tc.status)
+			}
+		})
+	}
+}

@@ -1,8 +1,12 @@
 name: Release
 
-# The filename matters. Every one of the six npm packages has a trusted
+# The filename matters. Every one of the seven npm packages has a trusted
 # publisher on npmjs.com naming this workflow, so renaming this file breaks
-# publishing until all six are reconfigured.
+# publishing until all seven are reconfigured.
+#
+# The seven are five platform packages, each carrying both binaries, plus one
+# wrapper per frontend: @gyeonghokim/gerrit-mcp-server and
+# @gyeonghokim/gerrit-cli.
 
 on:
   push:
@@ -41,6 +45,13 @@ jobs:
       - name: Assemble the npm packages
         run: node scripts/build-npm-packages.mjs "${GITHUB_REF_NAME}"
 
+      # Before the first publish rather than after the fourth. Publishing is
+      # not a transaction: a set that turns out to be incomplete or
+      # inconsistent halfway through leaves some packages up at a version the
+      # others never reach, and npm does not allow republishing over it.
+      - name: Check the assembled packages
+        run: node scripts/check-npm-packages.mjs "${GITHUB_REF_NAME}"
+
       # Platform packages go first: the wrapper pins them by exact version, so
       # publishing the wrapper first would leave a window where installing it
       # fails.
@@ -55,5 +66,10 @@ jobs:
             npm publish "${package}" --provenance --access public
           done
 
-      - name: Publish the wrapper package
-        run: npm publish dist/npm/gerrit-mcp-server --provenance --access public
+      # One per frontend, both pinning the platform packages published above.
+      - name: Publish the wrapper packages
+        run: |
+          for package in dist/npm/gerrit-mcp-server dist/npm/gerrit-cli; do
+            echo "publishing ${package}"
+            npm publish "${package}" --provenance --access public
+          done

@@ -61,18 +61,28 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 		return nil
 	}
 
-	return serve(ctx)
+	return serve(ctx, os.LookupEnv, stderr, &mcp.StdioTransport{})
 }
 
-// serve builds the server from the environment and runs it over stdio until
-// the client disconnects.
-func serve(ctx context.Context) error {
-	cfg, err := config.Load(os.LookupEnv)
+// serve builds the server from the environment and runs it over transport
+// until the client disconnects.
+//
+// The environment, the diagnostic sink and the transport are all injected so
+// that a test can drive the whole wiring over an in-memory transport; main
+// supplies the real ones. Nothing here may reach for os.Stdout: that is the
+// transport's, and only the transport's.
+func serve(
+	ctx context.Context,
+	lookup func(string) (string, bool),
+	stderr io.Writer,
+	transport mcp.Transport,
+) error {
+	cfg, err := config.Load(lookup)
 	if err != nil {
 		return fmt.Errorf("reading configuration: %w", err)
 	}
 
-	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: cfg.LogLevel}))
+	logger := slog.New(slog.NewTextHandler(stderr, &slog.HandlerOptions{Level: cfg.LogLevel}))
 
 	// Deliberately not the token. Everything here is safe in a shared log.
 	logger.Info("serving gerrit over stdio",
@@ -99,7 +109,7 @@ func serve(ctx context.Context) error {
 
 	server := mcpserver.New(client, cfg.AllowWrite)
 
-	if err = server.Run(ctx, &mcp.StdioTransport{}); err != nil {
+	if err = server.Run(ctx, transport); err != nil {
 		return fmt.Errorf("serving over stdio: %w", err)
 	}
 
