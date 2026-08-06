@@ -32,7 +32,8 @@ Terms are ANDed by default. Quote the whole query in the shell.
 ## Combining them
 
 - Space means AND — `is:open project:platform/base`.
-- `OR` must be uppercase — `is:merged OR is:abandoned`.
+- `OR` gives alternatives — `is:merged OR is:abandoned`. Gerrit takes `or` in
+  lower case as a synonym, but the upper case reads better beside the operators.
 - `-` negates — `-owner:self`.
 - Parentheses group — `is:open AND (owner:self OR reviewer:self)`.
 
