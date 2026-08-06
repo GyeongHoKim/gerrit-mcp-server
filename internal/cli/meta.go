@@ -83,7 +83,10 @@ func writeCommandHelp(ctx context.Context, deps Deps, name string) error {
 // writeHelp prints the command list.
 func writeHelp(out io.Writer) error {
 	commands := GerritCommands()
-	width := nameWidth(commands)
+	// Every section is padded to one width, so it has to come from every
+	// command listed rather than from the Gerrit ones alone: a longer meta
+	// command would otherwise ask for negative padding and panic.
+	width := nameWidth(append(commands, metaCommands()...))
 
 	var body strings.Builder
 
