@@ -19,11 +19,28 @@ const NEEDS_SHELL = process.platform === "win32";
  * Quote one argument for cmd.exe, which splits on spaces and does not
  * understand single quotes.
  *
+ * cmd.exe expands %VAR% inside double quotes too, and a percent sign cannot be
+ * escaped on the command line -- ^ is literal once a quote is open. An argument
+ * carrying one is therefore refused rather than passed through mangled into a
+ * path that is not the one this asked for. Every argument here is a path this
+ * repository generated, so the fix is a build directory without a percent sign
+ * in it.
+ *
  * @param {string} argument one npm argument
  * @returns {string} the argument, quoted if it needs to be
  */
 function quoteForShell(argument) {
-  if (!NEEDS_SHELL || !/[\s&|<>^]/.test(argument)) {
+  if (!NEEDS_SHELL) {
+    return argument;
+  }
+
+  if (argument.includes("%")) {
+    throw new Error(
+      `cmd.exe would expand the percent sign in ${argument}; run this from a path without one`,
+    );
+  }
+
+  if (!/[\s&|<>^"]/.test(argument)) {
     return argument;
   }
 
