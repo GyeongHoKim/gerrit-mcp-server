@@ -450,6 +450,28 @@ func TestQueryChangesRendersExactly(t *testing.T) {
 	}
 }
 
+// TestGetBugsFromCLParsesTheCommitTrailers walks the one read command whose
+// answer is computed rather than reformatted.
+//
+// The bug id is not a field in the payload: Gerrit only parses footers for the
+// 3.x-only /message endpoint, so internal/gerrit reads the commit and parses
+// the trailers itself. Asserting the id, rather than merely that something was
+// written, is what holds that end to end.
+func TestGetBugsFromCLParsesTheCommitTrailers(t *testing.T) {
+	t.Parallel()
+
+	body := readFixtures()["get-bugs-from-cl"]
+
+	got := runCLI(t, serveJSON(t, body), invocation("get-bugs-from-cl")...)
+	if got.err != nil {
+		t.Fatalf("get-bugs-from-cl returned an unexpected error: %v", got.err)
+	}
+
+	if !strings.Contains(got.stdout, "42") {
+		t.Errorf("stdout = %q, want the bug id from the commit trailers", got.stdout)
+	}
+}
+
 // readFixtures is a body each read command can actually decode.
 //
 // The shapes differ -- a list, a map keyed by file, a single object -- and

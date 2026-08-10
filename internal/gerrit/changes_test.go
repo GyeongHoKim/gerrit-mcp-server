@@ -414,10 +414,14 @@ func TestGetChangeMapsNotFound(t *testing.T) {
 func TestGetCommitMessage(t *testing.T) {
 	t.Parallel()
 
+	// A CommitInfo, which is what the revision endpoint answers on every
+	// supported version. The footers are not in the payload: Gerrit only
+	// parses them for the 3.x-only /message endpoint, so parseFooters has to
+	// produce the same map from the message text below.
 	const body = `{
+	  "commit": "674ac754f91e64a0efb8087e59a176484bd534d1",
 	  "subject": "Add feature X",
-	  "full_message": "Add feature X\n\nFeature X helps with foo.\n\nBug: 123\nChange-Id: I1039447\n",
-	  "footers": {"Bug": "123", "Change-Id": "I1039447"}
+	  "message": "Add feature X\n\nFeature X helps with foo.\n\nBug: 123\nChange-Id: I1039447\n"
 	}`
 
 	var gotPath string
@@ -435,7 +439,7 @@ func TestGetCommitMessage(t *testing.T) {
 		t.Fatalf("GetCommitMessage() returned an unexpected error: %v", err)
 	}
 
-	if want := "/a/changes/a%2Fb~main~I1/message"; gotPath != want {
+	if want := "/a/changes/a%2Fb~main~I1/revisions/current/commit"; gotPath != want {
 		t.Errorf("path = %q, want %q", gotPath, want)
 	}
 
@@ -449,6 +453,10 @@ func TestGetCommitMessage(t *testing.T) {
 
 	if want := "123"; got.Footers["Bug"] != want {
 		t.Errorf("Footers[Bug] = %q, want %q", got.Footers["Bug"], want)
+	}
+
+	if want := "I1039447"; got.Footers["Change-Id"] != want {
+		t.Errorf("Footers[Change-Id] = %q, want %q", got.Footers["Change-Id"], want)
 	}
 }
 
