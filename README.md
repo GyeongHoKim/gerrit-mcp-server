@@ -1,5 +1,7 @@
 # gerrit-mcp-server
 
+[한국어 문서](README.ko.md)
+
 [![CI](https://github.com/GyeongHoKim/gerrit-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/GyeongHoKim/gerrit-mcp-server/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@gyeonghokim/gerrit-mcp-server)](https://www.npmjs.com/package/@gyeonghokim/gerrit-mcp-server)
 [![Go](https://img.shields.io/badge/go-1.26-00ADD8)](https://go.dev)
@@ -8,7 +10,7 @@
 Connect your AI coding agent to Gerrit code review.
 
 Ask your agent to find the changes waiting on you, read a diff, draft line comments, and publish a
-review — without leaving the session and without pasting change numbers back and forth.
+review — without leaving the session and without pasting code review comments back and forth.
 
 It ships as **two frontends over the same code**, so you can pick how much of your agent's context
 you want to spend:
@@ -59,7 +61,7 @@ gerrit-cli init
 ```
 
 **4. Check it.** `gerrit-cli config` reports every setting and where it came from, naming anything
-still missing. Then ask your agent: *"What changes am I reviewing?"*
+still missing. Then ask your agent: *"What’s the verified score for XXX Change Id’s review?"*
 
 To allow the commands that modify Gerrit, set `GERRIT_ALLOW_WRITE=true` — see
 [Available tools and commands](#available-tools-and-commands).
@@ -308,12 +310,14 @@ just ci          # everything CI runs
 just --list      # all tasks
 ```
 
-See [AGENTS.md](AGENTS.md) for architecture, conventions, and the Gerrit API details worth knowing
+If you are AI Coding Agent(Codex, Claude Code, OpenCode, etc.), See [AGENTS.md](AGENTS.md) for architecture, conventions, and the Gerrit API details worth knowing
 before you touch the client.
 
 ## License
 
 [Elastic License 2.0](LICENSE).
+
+> It is prohibited to deploy this MCP server as a commercial service.
 
 **Using this at work is fine.** ELv2 places exactly three restrictions on you: you may not offer
 this software to third parties as a hosted or managed service, you may not circumvent license key
