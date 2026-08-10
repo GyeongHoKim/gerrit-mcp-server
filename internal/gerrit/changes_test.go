@@ -368,8 +368,8 @@ func TestGetChange(t *testing.T) {
 		t.Errorf("ChangeID = %q, want the Change-Id footer", got.ChangeID)
 	}
 
-	if got.UnresolvedCommentCount != 2 {
-		t.Errorf("UnresolvedCommentCount = %d, want 2", got.UnresolvedCommentCount)
+	if got.UnresolvedCommentCount == nil || *got.UnresolvedCommentCount != 2 {
+		t.Errorf("UnresolvedCommentCount = %v, want 2", got.UnresolvedCommentCount)
 	}
 
 	// The embedded ChangeInfo must decode alongside the detail-only fields.
@@ -396,6 +396,39 @@ func TestGetChangeRejectsEmptyID(t *testing.T) {
 
 	if _, err := client.GetChange(t.Context(), "  "); !errors.Is(err, ErrEmptyChangeID) {
 		t.Errorf("GetChange() error = %v, want ErrEmptyChangeID", err)
+	}
+}
+
+// Gerrit did not report comment counts before 3.0, so a detail from a 2.x
+// host simply has no such keys. They have to come back absent rather than
+// zero, or every change on an old server would claim to have no comments.
+func TestGetChangeLeavesAbsentCommentCountsUnset(t *testing.T) {
+	t.Parallel()
+
+	const body = `{
+	  "id": "p~1", "project": "p", "branch": "main", "subject": "s",
+	  "status": "NEW", "_number": 1, "change_id": "Iabc",
+	  "updated": "2026-07-31 06:04:05.000000000",
+	  "owner": {"_account_id": 1, "name": "Alice Adams"}
+	}`
+
+	client := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		if _, err := w.Write([]byte(xssiPrefix + "\n" + body)); err != nil {
+			t.Errorf("writing test response: %v", err)
+		}
+	})
+
+	got, err := client.GetChange(t.Context(), "1")
+	if err != nil {
+		t.Fatalf("GetChange() returned an unexpected error: %v", err)
+	}
+
+	if got.TotalCommentCount != nil {
+		t.Errorf("TotalCommentCount = %d, want it unset", *got.TotalCommentCount)
+	}
+
+	if got.UnresolvedCommentCount != nil {
+		t.Errorf("UnresolvedCommentCount = %d, want it unset", *got.UnresolvedCommentCount)
 	}
 }
 

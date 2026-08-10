@@ -208,17 +208,21 @@ type ChangeDetail struct {
 	Labels map[string]LabelInfo `json:"labels,omitempty"`
 	// Reviewers is keyed by state: REVIEWER, CC or REMOVED.
 	Reviewers map[string][]AccountInfo `json:"reviewers,omitempty"`
+	// TotalCommentCount counts every comment on the change.
+	//
+	// A pointer because Gerrit before 3.0 does not send these at all, and an
+	// absent count is not a count of zero: printing "0 total" for a change
+	// with fifty comments is worse than not printing the line.
+	TotalCommentCount *int `json:"total_comment_count,omitempty"`
+	// UnresolvedCommentCount counts the comments still marked unresolved, and
+	// is absent on the same servers as the total above.
+	UnresolvedCommentCount *int `json:"unresolved_comment_count,omitempty"`
 	// ChangeID is the Change-Id footer from the commit message.
 	ChangeID string `json:"change_id"`
 	// Embedded after the pointer-bearing fields so the struct's scannable
 	// prefix stays short. Field order has no bearing on the JSON, which is
 	// keyed by name.
 	ChangeInfo
-
-	// TotalCommentCount counts every comment on the change.
-	TotalCommentCount int `json:"total_comment_count"`
-	// UnresolvedCommentCount counts the comments still marked unresolved.
-	UnresolvedCommentCount int `json:"unresolved_comment_count"`
 }
 
 // ErrEmptyChangeID reports a call with no change to act on.
