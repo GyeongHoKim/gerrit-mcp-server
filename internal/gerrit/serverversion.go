@@ -17,6 +17,13 @@ import (
 // unknown as "offer it and let Gerrit answer".
 var ErrUnknownServerVersion = errors.New("unrecognised gerrit version")
 
+// ErrUnsupportedByServer reports an endpoint this Gerrit is too old to have.
+//
+// Declared here rather than with the transport sentinels in client.go: it is a
+// conclusion drawn from a version, not a status Gerrit answered with. What the
+// server actually sent was a 404.
+var ErrUnsupportedByServer = errors.New("not supported by this gerrit")
+
 // probeTimeout bounds the version probe.
 //
 // Deliberately not the configured request timeout. Someone raises that to
@@ -127,6 +134,37 @@ func (c *Client) GetServerVersion(ctx context.Context) (ServerVersion, error) {
 	}
 
 	return c.serverVersion, c.versionErr
+}
+
+// unsupportedIfOlder rewrites a failure that turned out to mean the host is
+// too old for the endpoint, and leaves every other failure alone.
+//
+// The status cannot say so by itself: POST /changes/999/wip answers 404 both
+// for a change that does not exist and for a Gerrit that does not have the
+// endpoint. Guessing from the 404 would send someone who mistyped a change
+// number off to read release notes, and would report "ask a human" for
+// something "fix the number" describes exactly. So the version is asked for,
+// and only a host that really is older gets the clearer error.
+//
+// Everything else falls through unchanged, which is what makes this fail open
+// rather than by policy: a version that could not be determined, or a fork
+// that backported the endpoint and answers 200, is never refused. The cost is
+// one request, and only on a call that has already failed.
+func (c *Client) unsupportedIfOlder(ctx context.Context, err error, needs ServerVersion) error {
+	if err == nil || !errors.Is(err, ErrNotFound) {
+		return err
+	}
+
+	running, versionErr := c.GetServerVersion(ctx)
+	if versionErr != nil || !running.Before(needs) {
+		return err
+	}
+
+	// The 404 is deliberately not wrapped. Nothing is missing; the endpoint
+	// was never there, and leaving ErrNotFound in the chain would have a
+	// caller report it as a change that does not exist.
+	return fmt.Errorf("%w: needs gerrit %s or newer, and this host reports %s",
+		ErrUnsupportedByServer, needs, running)
 }
 
 // fetchServerVersion performs the probe.

@@ -1,10 +1,13 @@
 package gerrit
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
+	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -408,5 +411,170 @@ func TestRevertSubmission(t *testing.T) {
 
 	if got.RevertChanges[1].Project != "q" {
 		t.Errorf("second revert project = %q, want q", got.RevertChanges[1].Project)
+	}
+}
+
+// versionPath is what unsupportedIfOlder consults to tell an endpoint that
+// was never there from a change that does not exist.
+const versionPath = "/a/config/server/version"
+
+// serveGerritOfVersion answers 404 on every path but the version endpoint,
+// which reports version.
+//
+// An empty version leaves that endpoint answering 404 as well, which is the
+// host that keeps it behind a proxy -- the case the fail-open rule exists for.
+func serveGerritOfVersion(t *testing.T, version string) http.HandlerFunc {
+	t.Helper()
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.EscapedPath() != versionPath || version == "" {
+			w.WriteHeader(http.StatusNotFound)
+
+			return
+		}
+
+		if _, err := w.Write([]byte(xssiPrefix + "\n\"" + version + "\"")); err != nil {
+			t.Errorf("writing test response: %v", err)
+		}
+	}
+}
+
+// gatedAction is one operation that does not exist on every supported Gerrit.
+type gatedAction struct {
+	call func(context.Context, *Client) error
+	min  ServerVersion
+}
+
+// gatedActions is the whole set, with the release each one needs spelled out
+// so that a reader can see the claim being tested without looking it up.
+func gatedActions() map[string]gatedAction {
+	return map[string]gatedAction{
+		"SetWorkInProgress": {
+			call: func(ctx context.Context, c *Client) error {
+				return c.SetWorkInProgress(ctx, "12345", "")
+			},
+			min: MinVersionWorkInProgress,
+		},
+		"SetReadyForReview": {
+			call: func(ctx context.Context, c *Client) error {
+				return c.SetReadyForReview(ctx, "12345", "")
+			},
+			min: MinVersionWorkInProgress,
+		},
+		"RevertSubmission": {
+			call: func(ctx context.Context, c *Client) error {
+				_, err := c.RevertSubmission(ctx, "12345", "")
+
+				return err
+			},
+			min: MinVersionRevertSubmission,
+		},
+	}
+}
+
+// A 2.14 host has none of these endpoints, so its 404 means the endpoint was
+// never there and the caller is told which release would have it.
+func TestGatedActionsReportAnOldServer(t *testing.T) {
+	t.Parallel()
+
+	for name, action := range gatedActions() {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			client := newTestClient(t, serveGerritOfVersion(t, "2.14.22"))
+
+			err := action.call(t.Context(), client)
+			if !errors.Is(err, ErrUnsupportedByServer) {
+				t.Fatalf("%s error = %v, want ErrUnsupportedByServer", name, err)
+			}
+
+			// Both numbers, because either alone leaves the reader guessing
+			// what to do about it.
+			for _, want := range []string{action.min.String(), "2.14"} {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("%s error = %q, want it to name %q", name, err, want)
+				}
+			}
+
+			// Nothing is missing. Leaving ErrNotFound in the chain would have
+			// gerrit-cli report exit 5 and send someone to check the change
+			// number.
+			if errors.Is(err, ErrNotFound) {
+				t.Errorf("%s error still reads as a missing change: %v", name, err)
+			}
+		})
+	}
+}
+
+// The same 404 on a host new enough to have the endpoint is a change that does
+// not exist, which is the far more common way to get one.
+func TestGatedActionsKeepNotFoundOnACurrentServer(t *testing.T) {
+	t.Parallel()
+
+	for name, action := range gatedActions() {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			client := newTestClient(t, serveGerritOfVersion(t, "3.14.1"))
+
+			err := action.call(t.Context(), client)
+			if !errors.Is(err, ErrNotFound) {
+				t.Fatalf("%s error = %v, want ErrNotFound", name, err)
+			}
+
+			if errors.Is(err, ErrUnsupportedByServer) {
+				t.Errorf("%s blamed the server version for a missing change: %v", name, err)
+			}
+		})
+	}
+}
+
+// A host that will not say which Gerrit it is gets the benefit of the doubt.
+// Reporting "too old" on a guess would be worse than reporting the 404 that
+// actually arrived.
+func TestGatedActionsKeepNotFoundWhenTheVersionIsUnknown(t *testing.T) {
+	t.Parallel()
+
+	for name, action := range gatedActions() {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			client := newTestClient(t, serveGerritOfVersion(t, ""))
+
+			err := action.call(t.Context(), client)
+			if !errors.Is(err, ErrNotFound) {
+				t.Fatalf("%s error = %v, want ErrNotFound", name, err)
+			}
+
+			if errors.Is(err, ErrUnsupportedByServer) {
+				t.Errorf("%s refused an operation on an undetermined version: %v", name, err)
+			}
+		})
+	}
+}
+
+// The version is asked for only when a call has already failed. A gated
+// operation that succeeds must cost exactly what it did before.
+func TestGatedActionsDoNotProbeOnSuccess(t *testing.T) {
+	t.Parallel()
+
+	var requests atomic.Int64
+
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+
+		if r.URL.EscapedPath() == versionPath {
+			t.Error("a successful call asked the server its version")
+		}
+
+		writeOK(t, w)
+	})
+
+	if err := client.SetWorkInProgress(t.Context(), "12345", ""); err != nil {
+		t.Fatalf("SetWorkInProgress() returned an unexpected error: %v", err)
+	}
+
+	if got := requests.Load(); got != 1 {
+		t.Errorf("requests = %d, want 1", got)
 	}
 }

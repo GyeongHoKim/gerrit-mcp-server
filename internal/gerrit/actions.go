@@ -39,15 +39,28 @@ type MessageInput struct {
 	Message string `json:"message,omitempty"`
 }
 
+// MinVersionWorkInProgress is the first Gerrit with /wip and /ready.
+//
+// Work-in-progress is a state 2.15 introduced; before it there was nothing for
+// these endpoints to set. A var rather than a const only because
+// [ServerVersion] is a struct -- nothing assigns to it.
+//
+//nolint:mnd // a release number is the constant, not a magic one
+var MinVersionWorkInProgress = ServerVersion{Major: 2, Minor: 15}
+
 // SetReadyForReview takes a change out of work-in-progress and notifies its
 // reviewers.
 func (c *Client) SetReadyForReview(ctx context.Context, changeID, message string) error {
-	return c.postMessage(ctx, changeID, "/ready", message)
+	err := c.postMessage(ctx, changeID, "/ready", message)
+
+	return c.unsupportedIfOlder(ctx, err, MinVersionWorkInProgress)
 }
 
 // SetWorkInProgress marks a change as not yet asking for review.
 func (c *Client) SetWorkInProgress(ctx context.Context, changeID, message string) error {
-	return c.postMessage(ctx, changeID, "/wip", message)
+	err := c.postMessage(ctx, changeID, "/wip", message)
+
+	return c.unsupportedIfOlder(ctx, err, MinVersionWorkInProgress)
 }
 
 // postMessage posts an action that takes nothing but an optional note and
@@ -140,6 +153,15 @@ type RevertSubmissionInfo struct {
 	RevertChanges []ChangeInfo `json:"revert_changes"`
 }
 
+// MinVersionRevertSubmission is the first Gerrit with /revert_submission.
+//
+// Reverting a whole submission arrived in 3.2; before it, each change in a
+// submission had to be reverted on its own. A var rather than a const only
+// because [ServerVersion] is a struct -- nothing assigns to it.
+//
+//nolint:mnd // a release number is the constant, not a magic one
+var MinVersionRevertSubmission = ServerVersion{Major: 3, Minor: 2}
+
 // RevertSubmission creates a change reverting every change submitted
 // alongside this one.
 func (c *Client) RevertSubmission(
@@ -155,7 +177,7 @@ func (c *Client) RevertSubmission(
 
 	var reverts RevertSubmissionInfo
 	if err := c.do(ctx, http.MethodPost, changePath(changeID, "/revert_submission"), nil, in, &reverts); err != nil {
-		return nil, err
+		return nil, c.unsupportedIfOlder(ctx, err, MinVersionRevertSubmission)
 	}
 
 	return &reverts, nil
