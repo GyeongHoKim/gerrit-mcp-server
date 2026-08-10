@@ -95,6 +95,15 @@ type Command struct {
 	Name string
 	// Summary is the single line `gerrit-cli help` prints.
 	Summary string
+	// MinVersion is the oldest Gerrit with the endpoint this command calls.
+	// The zero value means every supported version has it.
+	//
+	// Nothing here enforces it. internal/gerrit turns the 404 from a host
+	// without the endpoint into gerrit.ErrUnsupportedByServer, which costs no
+	// request until one has already failed and cannot wrongly refuse a fork
+	// that backported the endpoint. This field exists so that `help` can say
+	// so before anyone tries.
+	MinVersion gerrit.ServerVersion
 	// Write reports a command that modifies Gerrit. The dispatcher refuses
 	// these unless the configuration allows writes.
 	Write bool

@@ -108,6 +108,8 @@ func writeHelp(out io.Writer) error {
 
 	body.WriteString("\nConfiguration comes from " + config.EnvURL + ", " + config.EnvUser + " and " +
 		config.EnvToken + ", or from the file `" + ProgramName + " config` names.\n")
+	body.WriteString("A command marked with a Gerrit release fails with exit 4 on a host older than\n" +
+		"that, naming the release it needs and the one your host reports.\n")
 
 	if _, err := io.WriteString(out, body.String()); err != nil {
 		return fmt.Errorf("writing help: %w", err)
@@ -127,8 +129,23 @@ func writeSection(body *strings.Builder, title string, commands []Command, width
 
 	for _, command := range commands {
 		padding := width - len(command.Name) + columnGap
-		body.WriteString("  " + command.Name + strings.Repeat(" ", padding) + command.Summary + "\n")
+		body.WriteString("  " + command.Name + strings.Repeat(" ", padding) + summaryOf(command) + "\n")
 	}
+}
+
+// summaryOf returns what a command's line says about it.
+//
+// A version note is a suffix rather than a section of its own, because which
+// Gerrit a command needs is orthogonal to whether it writes: sectioning by
+// both would cut the list into four groups to mark three commands. Summary
+// itself is left alone so that it stays the one sentence describing what the
+// command does.
+func summaryOf(command Command) string {
+	if command.MinVersion.IsZero() {
+		return command.Summary
+	}
+
+	return command.Summary + "  (needs Gerrit " + command.MinVersion.String() + "+)"
 }
 
 // pick returns the commands whose Write flag matches want.

@@ -49,6 +49,19 @@ func mutating(command Command) Command {
 	return command
 }
 
+// since marks a command whose endpoint does not exist on every supported
+// Gerrit, so that `help` can name the release it needs.
+//
+// Spelled out at each constructor for the reason mutating is. The release
+// itself comes from internal/gerrit, where it sits beside the endpoint;
+// internal/mcpserver keeps the same association for its own tool names, and
+// its parity test holds the two equal.
+func since(needs gerrit.ServerVersion, command Command) Command {
+	command.MinVersion = needs
+
+	return command
+}
+
 // changeMessageCommand builds one of the commands that flips a change's state
 // with an optional note. Five have exactly this shape.
 func changeMessageCommand(
@@ -266,7 +279,7 @@ func setTopic() Command {
 
 // setReadyForReview marks a change ready.
 func setReadyForReview() Command {
-	return changeMessageCommand(
+	return since(gerrit.MinVersionWorkInProgress, changeMessageCommand(
 		"set-ready-for-review",
 		"Take a change out of work-in-progress and notify its reviewers.",
 		"optional note posted on the change explaining the action",
@@ -277,12 +290,12 @@ func setReadyForReview() Command {
 
 			return emit(deps.Options.Stdout, render.ReadyForReviewSet(changeID))
 		},
-	)
+	))
 }
 
 // setWorkInProgress marks a change work-in-progress.
 func setWorkInProgress() Command {
-	return changeMessageCommand(
+	return since(gerrit.MinVersionWorkInProgress, changeMessageCommand(
 		"set-work-in-progress",
 		"Mark a change work-in-progress so it stops asking for attention.",
 		"optional note posted on the change explaining the action",
@@ -293,7 +306,7 @@ func setWorkInProgress() Command {
 
 			return emit(deps.Options.Stdout, render.WorkInProgressSet(changeID))
 		},
-	)
+	))
 }
 
 // abandonChange abandons a change.
@@ -332,7 +345,7 @@ func revertChange() Command {
 
 // revertSubmission reverts a whole submission.
 func revertSubmission() Command {
-	return changeMessageCommand(
+	return since(gerrit.MinVersionRevertSubmission, changeMessageCommand(
 		"revert-submission",
 		"Open changes reverting everything submitted alongside this one.",
 		"optional note for the reverts' commit messages",
@@ -344,7 +357,7 @@ func revertSubmission() Command {
 
 			return emit(deps.Options.Stdout, render.SubmissionReverted(changeID, reverts))
 		},
-	)
+	))
 }
 
 // createChange opens a new change.
