@@ -26,6 +26,10 @@ Do this once per session, before the first real command.
 
 Never invent a token. Never write a token into a file in the repository.
 
+Run **`gerrit-cli doctor`** only when you need it: a command exits 4 saying the
+host is too old, or the user is on a Gerrit you have not seen before. It reports
+the host's release and which commands that rules out, in one request.
+
 ## Command shape
 
 Subcommands are the words you would expect, with dashes: `query-changes`,
@@ -115,6 +119,15 @@ The status says what to do next. Read it before retrying.
 `gerrit-cli` cannot vote on labels (no `+2` or `-1`), cannot submit or rebase a
 change, and cannot upload a patchset. For those, point the user at the web UI or
 at `git push origin HEAD:refs/for/<branch>`.
+
+Three commands need a Gerrit newer than the 2.14 floor and exit 4 on an older
+host, naming the release they need:
+
+- `set-work-in-progress` and `set-ready-for-review` need **2.15+**
+- `revert-submission` needs **3.2+**
+
+Nothing about the command will fix that; point the user at the web UI. Run
+`gerrit-cli doctor` if you want the full picture for their host.
 
 ## Further reading
 

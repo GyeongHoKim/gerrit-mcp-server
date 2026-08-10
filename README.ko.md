@@ -197,6 +197,8 @@ CLI와 MCP 서버 둘 다 command 와 tool이 1:1 대응관계입니다. 예를 
 
 읽기 작업은 항상 사용할 수 있습니다. **쓰기 작업은 `GERRIT_ALLOW_WRITE=true`로 설정하기 전까지 비활성화됩니다.** 따라서 에이전트가 실수로 변경 사항을 abandon하거나 리뷰를 등록할 수 없습니다. MCP 서버는 쓰기 도구 자체를 등록하지 않으며, `gerrit-cli`는 도움말에는 표시하되 비활성 상태로 표시하고 실행을 거부합니다.
 
+호스트의 Gerrit이 너무 오래되어 없는 작업에도 같은 비대칭이 적용됩니다. [Supported Gerrit versions](#supported-gerrit-versions)를 참고하세요.
+
 ### Read
 
 | 도구 | 설명 |
@@ -214,6 +216,8 @@ CLI와 MCP 서버 둘 다 command 와 tool이 1:1 대응관계입니다. 예를 
 
 모든 값은 플래그로 지정합니다. `gerrit-cli`에는 위치 인자가 없습니다. 특정 명령의 플래그는 `gerrit-cli help <command>`로 확인하세요. 문서 업데이트를 깜빡하고 안할 수도 있어서 이 명령어 응답내용이 문서보다 더 정확할 수도 있습니다.
 
+`gerrit-cli`에는 대응하는 MCP 도구가 없는 자체 명령이 다섯 개 있습니다. `help`, `version`, `config`, `init`, 그리고 호스트의 Gerrit 릴리스와 그로 인해 못 쓰는 작업을 알려주는 `doctor`입니다.
+
 ### Write — requires `GERRIT_ALLOW_WRITE=true`
 
 | 도구 | 설명 |
@@ -224,12 +228,12 @@ CLI와 MCP 서버 둘 다 command 와 tool이 1:1 대응관계입니다. 예를 
 | `delete_draft_comments` | 변경 사항의 모든 초안 삭제 |
 | `add_reviewer` | 리뷰어 또는 참조(CC) 추가 |
 | `set_topic` | 토픽 설정 또는 삭제 |
-| `set_ready_for_review` | 변경 사항을 WIP 상태에서 해제 |
-| `set_work_in_progress` | 변경 사항을 WIP로 표시 |
+| `set_ready_for_review` | 변경 사항을 WIP 상태에서 해제 (Gerrit 2.15+ 필요) |
+| `set_work_in_progress` | 변경 사항을 WIP로 표시 (Gerrit 2.15+ 필요) |
 | `create_change` | 변경 사항 생성 |
 | `abandon_change` | 변경 사항 abandon |
 | `revert_change` | 변경 사항 되돌리기 |
-| `revert_submission` | 전체 제출 되돌리기 |
+| `revert_submission` | 전체 제출 되돌리기 (Gerrit 3.2+ 필요) |
 
 ## Exit codes
 
@@ -241,13 +245,31 @@ CLI와 MCP 서버 둘 다 command 와 tool이 1:1 대응관계입니다. 예를 
 | 1 | 기타 오류 발생. stderr 확인 |
 | 2 | 잘못된 인자 |
 | 3 | 설정되지 않음 — `gerrit-cli init` 실행 |
-| 4 | 권한 없음 — 계정 권한 또는 `GERRIT_ALLOW_WRITE` 확인 |
+| 4 | 권한 없음 — 계정 권한, `GERRIT_ALLOW_WRITE`, 또는 이 작업에 너무 오래된 Gerrit |
 | 5 | 해당 변경 사항, 파일 또는 댓글 없음 |
 | 6 | 현재 상태에서는 작업을 수행할 수 없음 |
 
 ## Supported Gerrit versions
 
-Gerrit **3.14** REST API를 기준으로 빌드하고 테스트했습니다. **3.12 이상**에서 동작할 것으로 예상하지만, 더 오래된 버전에서는 일부 초안 댓글 엔드포인트가 없습니다.
+Gerrit **3.14** REST API를 기준으로 빌드하고 테스트했으며, **2.14**까지 지원합니다.
+
+오래된 호스트에서도 거의 모든 기능이 그대로 동작합니다. 이 문서가 예전에 지목했던 초안 댓글 엔드포인트도 포함해서요. 실제로 존재하지 않는 것은 쓰기 작업 세 개뿐입니다.
+
+| 작업 | 필요 버전 |
+| --- | --- |
+| `set_work_in_progress` / `set-work-in-progress` | Gerrit 2.15+ |
+| `set_ready_for_review` / `set-ready-for-review` | Gerrit 2.15+ |
+| `revert_submission` / `revert-submission` | Gerrit 3.2+ |
+
+두 프론트엔드는 이를 쓰기 권한과 같은 방식으로 처리합니다. `gerrit-mcp-server`는 호스트에 릴리스를 물어보고 제공할 수 없는 도구를 제거한 뒤 도구 목록이 바뀌었음을 클라이언트에 알립니다. `gerrit-cli`는 각 명령에 필요한 릴리스를 함께 표시하고, 그래도 실행하면 필요한 릴리스와 호스트가 보고한 릴리스를 모두 알려주며 exit 4로 종료합니다.
+
+**릴리스를 알아낼 수 없으면 전부 제공합니다.** 버전 엔드포인트를 가로막는 프록시나, 엔드포인트를 백포트한 사내 포크에서 멀쩡히 동작하는 작업을 잃어서는 안 되기 때문입니다. 따라서 버전 불명은 아무것도 숨기지 않으며, 정말 없는 기능은 그때 명확한 메시지와 함께 실패합니다.
+
+한 가지 더. Gerrit은 3.0 이전에 댓글 수를 보고하지 않았으므로, 오래된 호스트에서는 `get_change_details`가 0이라고 말하는 대신 그 줄을 생략합니다.
+
+```bash
+gerrit-cli doctor    # 호스트가 어떤 릴리스인지, 그래서 무엇을 못 쓰는지
+```
 
 ## Other ways to install
 

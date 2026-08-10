@@ -107,6 +107,18 @@ built, so nothing reaches Gerrit. Adding a mutating operation to either read set
 functions rather than package-level slices for the same reason: a var could be appended to from
 anywhere in the package.
 
+**A minimum Gerrit version is declared once and associated twice.** The release itself goes in
+`internal/gerrit`, beside the endpoint that needs it (`MinVersionWorkInProgress` in `actions.go`),
+because it is a fact about the Gerrit API. Which operation calls that endpoint is a fact about a
+frontend, so `minVersions()` in `internal/mcpserver` and `since(...)` in `internal/cli` each state
+their own — and `parity_test.go` holds the two equal, the same way it holds the inventory.
+
+The two frontends then act on it differently, mirroring the write split. `internal/mcpserver`
+removes the tool after connecting and lets the SDK send `tools/list_changed`, because a model
+cannot call a tool it cannot see. `internal/cli` lists the command with the release it needs and
+lets it fail, because a caller there can type any string. Neither checks before the call:
+`internal/gerrit` converts the 404, which costs no request until one has already failed.
+
 ## Gerrit API notes
 
 These are the things that will waste your afternoon if you do not know them. The authoritative
@@ -121,8 +133,22 @@ reference is the AsciiDoc in `doc/` — run `just fetch-gerrit-docs` to get it.
   `project~branch~Change-Id`. Project names routinely contain `/`, so an id must reach Gerrit as one
   escaped path segment — but escaping an id Gerrit handed you turns `%2F` into `%252F` and 404s a
   change that plainly exists. `changePath` unescapes before escaping so both forms work.
-- **Not every endpoint exists on every version.** We target 3.14 and support 3.12+. Draft comment
-  endpoints are the ones that move.
+- **Not every endpoint exists on every version.** We build and test against 3.14 and support
+  **2.14+**. Only three operations are actually missing on an older host: `/wip` and `/ready`
+  arrived in 2.15, `/revert_submission` in 3.2. Draft comment endpoints are *not* among them —
+  they work on 2.14 — and neither is anything else in the inventory.
+- **`GET /changes/{id}/message` is 3.x only.** It hands back footers Gerrit parsed for you, which
+  is why it is tempting. `GET /changes/{id}/revisions/{rev}/commit` answers the same question on
+  every supported release, so `GetCommitMessage` uses that one and `parseFooters` reads the git
+  trailers itself. One code path beats a branch on which host answered.
+- **`total_comment_count` and `unresolved_comment_count` are absent before 3.0.** They are `*int`
+  for that reason: an absent count is not a count of zero, and the renderer omits the line rather
+  than inventing a number.
+- **Version handling fails open.** A release that cannot be determined — a proxy in the way, an
+  unreadable string, an enterprise fork reporting whatever it forked from — offers everything.
+  Hiding an operation that would have worked is worse than offering one that fails with an
+  explanation, and `unsupportedIfOlder` is built so that fail-open is the fallthrough rather than
+  a branch someone can forget.
 
 ## Commits
 
@@ -160,6 +186,17 @@ Do not use `--no-verify`. If a hook is wrong, fix the hook.
   what makes `TestInitNeverReadsStdinWithoutATerminal` possible, and that test is the reason `init`
   is shaped the way it is.
 - Tests run with `-race` in CI on Linux, macOS and Windows.
+- **Version behaviour is covered by stubs that report an old release.** A handler answering
+  `"2.14.22"` is indistinguishable from a real 2.14 for everything this client does, because the
+  only things the code reads are that string and the 404s. The floor itself cannot be run here —
+  official Docker images start around 2.16 — so a change to the version logic is verified by adding
+  a case to `ParseServerVersion`'s table and to the 404-conversion tests, not by standing up a
+  container. That table is an inventory of strings seen in the wild; add to it rather than
+  inventing cases.
+- One assumption rests on nothing we can execute: that a 2.14 host answers **404**, not 405 or 400,
+  for an endpoint it never had. Fail-open contains the damage either way — a non-404 stays whatever
+  Gerrit said — but the "too old" diagnosis simply would not fire. Confirm it against a real 2.14
+  host before claiming the floor in a release.
 
 ## Releasing
 

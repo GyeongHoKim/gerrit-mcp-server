@@ -25,7 +25,7 @@ agent should not run it — it reads the token from stdin.
 
 ## Exit 4 — not permitted
 
-Three different causes, distinguishable from the message.
+Four different causes, distinguishable from the message.
 
 - **`GERRIT_ALLOW_WRITE` is not set.** The command modifies Gerrit and the
   opt-in is missing. Tell the user; do not set it yourself.
@@ -37,6 +37,11 @@ Three different causes, distinguishable from the message.
 - **403 forbidden.** The account is authenticated but not allowed to do this on
   this project — a restricted repository, or a change owned by someone else on a
   host that limits who may abandon. Nothing about the command will fix it.
+- **The Gerrit is too old for this operation.** The message names both the
+  release the command needs and the release the host reports. Only
+  `set-work-in-progress`, `set-ready-for-review` and `revert-submission` can
+  fail this way. Nothing about the command will fix it either; `gerrit-cli
+  doctor` prints the whole matrix for the host.
 
 ## Exit 5 — not found
 
@@ -48,8 +53,10 @@ Usually the change id, occasionally the file path or a draft id.
 - File paths come from `list-change-files` and are repository-relative. There is
   no leading `./` and no leading slash.
 - Draft ids come from `list-draft-comments` and belong to one change.
-- Some draft comment endpoints do not exist on Gerrit older than 3.12. If
-  reading a change works but drafts 404, check the host's version.
+
+Not a version problem: the draft comment endpoints work on every Gerrit
+`gerrit-cli` supports. An operation the host is too old for exits 4 and says so,
+not 5.
 
 ## Exit 6 — conflict
 
