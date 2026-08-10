@@ -8,6 +8,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/GyeongHoKim/gerrit-mcp-server/internal/cli"
+	"github.com/GyeongHoKim/gerrit-mcp-server/internal/gerrit"
 )
 
 // The two frontends are one product with one inventory, and this file is the
@@ -24,6 +25,12 @@ import (
 // and the assertion in one file. There is no import cycle to worry about --
 // internal/cli imports gerrit, render, config and version, and never this
 // package.
+
+// The version gates are held here for the same reason. A release is a fact
+// about the Gerrit API, so internal/gerrit declares it beside the endpoint
+// that needs it; which operation calls that endpoint is a fact about a
+// frontend, so each states its own. Two statements of one thing drift, and
+// this is where that shows up.
 
 // commandName is the command gerrit-cli exposes for an MCP tool.
 func commandName(tool string) string {
@@ -78,5 +85,32 @@ func TestWriteToolsMapToWriteCommands(t *testing.T) {
 		if writes[name] {
 			t.Errorf("%s is a read tool but %s is gated on writes", tool, name)
 		}
+	}
+}
+
+// TestVersionGatesMatchAcrossFrontends holds the two frontends to one answer
+// about which Gerrit each operation needs.
+//
+// A single diff of the two maps rather than a loop of comparisons: it catches
+// a gate added on one side, dropped on one side, and set to a different
+// release, and prints all three the same readable way.
+func TestVersionGatesMatchAcrossFrontends(t *testing.T) {
+	t.Parallel()
+
+	want := make(map[string]gerrit.ServerVersion, len(minVersions()))
+	for tool, needs := range minVersions() {
+		want[commandName(tool)] = needs
+	}
+
+	got := make(map[string]gerrit.ServerVersion, len(want))
+
+	for _, command := range cli.GerritCommands() {
+		if !command.MinVersion.IsZero() {
+			got[command.Name] = command.MinVersion
+		}
+	}
+
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("version gate mismatch (-want +got):\n%s", diff)
 	}
 }
