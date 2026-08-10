@@ -52,6 +52,19 @@ type servedSession struct {
 func startServe(t *testing.T, env map[string]string, stderr io.Writer) servedSession {
 	t.Helper()
 
+	return startServeWith(t, env, stderr, nil)
+}
+
+// startServeWith is [startServe] for a test that needs the client to react to
+// something the server sends it.
+func startServeWith(
+	t *testing.T,
+	env map[string]string,
+	stderr io.Writer,
+	opts *mcp.ClientOptions,
+) servedSession {
+	t.Helper()
+
 	clientTransport, serverTransport := mcp.NewInMemoryTransports()
 
 	done := make(chan error, 1)
@@ -60,7 +73,7 @@ func startServe(t *testing.T, env map[string]string, stderr io.Writer) servedSes
 		done <- serve(t.Context(), lookupFrom(env), stderr, serverTransport)
 	}()
 
-	client := mcp.NewClient(&mcp.Implementation{Name: "test", Version: "v0"}, nil)
+	client := mcp.NewClient(&mcp.Implementation{Name: "test", Version: "v0"}, opts)
 
 	session, err := client.Connect(t.Context(), clientTransport, nil)
 	if err != nil {
@@ -68,6 +81,39 @@ func startServe(t *testing.T, env map[string]string, stderr io.Writer) servedSes
 	}
 
 	return servedSession{session: session, done: done}
+}
+
+// A client subscribed to tools/list_changed leaves a subscriptions/listen
+// request in flight for the life of the subscription, so disconnecting always
+// fails it with the SDK's "server is closing". That is an ordinary disconnect
+// and must not be reported as a failure to serve.
+//
+// The subscription needs nothing from Gerrit: the SDK advertises
+// tools.listChanged whenever a server has any tools, so this reproduces
+// against a host that is never dialled.
+func TestServeEndsCleanlyForASubscribedClient(t *testing.T) {
+	t.Parallel()
+
+	var stderr bytes.Buffer
+
+	served := startServeWith(t, validEnv(), &stderr, &mcp.ClientOptions{
+		ToolListChangedHandler: func(context.Context, *mcp.ToolListChangedRequest) {},
+	})
+
+	// Listed first so the subscription is certainly established before the
+	// client goes away.
+	if _, err := served.session.ListTools(t.Context(), nil); err != nil {
+		t.Fatalf("listing tools: %v", err)
+	}
+
+	if err := served.stop(t); err != nil {
+		t.Errorf("serve() = %v, want a clean return", err)
+	}
+
+	// Discarded, not hidden: how the pipe broke is still worth a line.
+	if !strings.Contains(stderr.String(), "the client disconnected") {
+		t.Errorf("stderr does not record how the session ended:\n%s", stderr.String())
+	}
 }
 
 // stop disconnects the client and returns what serve returned.

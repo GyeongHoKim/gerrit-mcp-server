@@ -109,9 +109,46 @@ func serve(
 
 	server := mcpserver.New(client, cfg.AllowWrite)
 
-	if err = server.Run(ctx, transport); err != nil {
+	// Not mcp.Server.Run, which collapses connecting and serving into one
+	// error. Failing to connect is this process failing to start; a session
+	// ending is the client going away, and the two do not deserve the same
+	// exit status.
+	session, err := server.Connect(ctx, transport, nil)
+	if err != nil {
 		return fmt.Errorf("serving over stdio: %w", err)
 	}
 
+	wait(ctx, session, logger)
+
 	return nil
+}
+
+// wait blocks until the client disconnects or the context is cancelled.
+//
+// How a session ended is logged rather than returned. On stdio there is one
+// client and one way for a session to end -- the other end went away -- so a
+// broken pipe is a diagnostic and not an exit status. A client subscribed to
+// tools/list_changed always ends this way: its subscription is a
+// subscriptions/listen request the server holds open for the subscription's
+// lifetime, and disconnecting fails that request however cleanly the client
+// left.
+//
+// A cancelled context closes the session rather than abandoning it, and the
+// goroutine waiting on it is joined either way.
+func wait(ctx context.Context, session *mcp.ServerSession, logger *slog.Logger) {
+	closed := make(chan error, 1)
+
+	go func() { closed <- session.Wait() }()
+
+	select {
+	case err := <-closed:
+		if err != nil {
+			logger.Info("the client disconnected", "reason", err)
+		}
+	case <-ctx.Done():
+		// The error is the session's own; a close that fails on the way out
+		// tells nobody anything they can act on.
+		_ = session.Close() //nolint:errcheck // see above
+		<-closed
+	}
 }
