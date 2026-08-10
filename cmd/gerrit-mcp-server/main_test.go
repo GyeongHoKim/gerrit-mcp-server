@@ -6,6 +6,8 @@ import (
 	"errors"
 	"flag"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"slices"
 	"strings"
 	"testing"
@@ -32,13 +34,43 @@ func lookupFrom(env map[string]string) func(string) (string, bool) {
 }
 
 // validEnv is the smallest environment serve accepts. The host is never
-// dialled: listing tools does not reach Gerrit.
+// dialled: listing tools does not reach Gerrit, and a server without
+// GERRIT_ALLOW_WRITE does not probe for the version either, because every
+// version-gated tool is a write tool.
+//
+// A test that turns writes on does dial this host. It does not resolve, so the
+// probe fails and every tool stays offered, which is the fail-open path.
 func validEnv() map[string]string {
 	return map[string]string{
 		config.EnvURL:   "https://gerrit.example.com",
 		config.EnvUser:  "alice",
 		config.EnvToken: "s3cret",
 	}
+}
+
+// envAgainst is validEnv pointed at a stub Gerrit that reports version, with
+// writes enabled so that the version-gated tools are registered to begin with.
+func envAgainst(t *testing.T, version string) map[string]string {
+	t.Helper()
+
+	stub := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.EscapedPath() != "/a/config/server/version" {
+			w.WriteHeader(http.StatusNotFound)
+
+			return
+		}
+
+		if _, err := w.Write([]byte(")]}'\n\"" + version + "\"")); err != nil {
+			t.Errorf("writing stub response: %v", err)
+		}
+	}))
+	t.Cleanup(stub.Close)
+
+	env := validEnv()
+	env[config.EnvURL] = stub.URL
+	env[config.EnvAllowWrite] = "true"
+
+	return env
 }
 
 // servedSession is a running serve call with a client attached to it.
@@ -311,6 +343,110 @@ func TestServeRegistersWriteToolsOnlyWhenAllowed(t *testing.T) {
 				t.Errorf("serve() = %v, want a clean return", stopErr)
 			}
 		})
+	}
+}
+
+// toolNames lists what the client can currently see.
+func toolNames(t *testing.T, session *mcp.ClientSession) []string {
+	t.Helper()
+
+	tools, err := session.ListTools(t.Context(), nil)
+	if err != nil {
+		t.Fatalf("listing tools: %v", err)
+	}
+
+	names := make([]string, 0, len(tools.Tools))
+	for _, tool := range tools.Tools {
+		names = append(names, tool.Name)
+	}
+
+	return names
+}
+
+// The prune happens after Connect, so the client learns about it through
+// notifications/tools/list_changed. Waiting on the notification rather than
+// polling is deliberate: that it fires at all is the load-bearing claim behind
+// pruning post-connect rather than delaying startup to probe first.
+func TestServeHidesToolsAnOldGerritCannotServe(t *testing.T) {
+	t.Parallel()
+
+	changed := make(chan struct{}, 1)
+
+	served := startServeWith(t, envAgainst(t, "2.14.22"), io.Discard, &mcp.ClientOptions{
+		ToolListChangedHandler: func(context.Context, *mcp.ToolListChangedRequest) {
+			select {
+			case changed <- struct{}{}:
+			default:
+			}
+		},
+	})
+
+	select {
+	case <-changed:
+	case <-t.Context().Done():
+		t.Fatal("the server never announced a change to its tool list")
+	}
+
+	got := toolNames(t, served.session)
+
+	for _, gone := range []string{"revert_submission", "set_work_in_progress", "set_ready_for_review"} {
+		if slices.Contains(got, gone) {
+			t.Errorf("%s is still offered by a 2.14 server", gone)
+		}
+	}
+
+	// The rest of the write set is untouched. A prune that took the whole
+	// group would be indistinguishable from one that worked, from the outside.
+	if !slices.Contains(got, "abandon_change") {
+		t.Errorf("abandon_change was pruned; it works on every supported version")
+	}
+
+	if stopErr := served.stop(t); stopErr != nil {
+		t.Errorf("serve() = %v, want a clean return", stopErr)
+	}
+}
+
+// A current Gerrit gets everything, and says nothing about it. The assertion
+// that matters is the tool list; the absence of a notification is not worth
+// waiting on a timeout to prove.
+func TestServeKeepsEveryToolOnACurrentGerrit(t *testing.T) {
+	t.Parallel()
+
+	served := startServe(t, envAgainst(t, "3.14.1"), io.Discard)
+
+	if got := toolNames(t, served.session); !slices.Contains(got, "revert_submission") {
+		t.Errorf("revert_submission is missing from a 3.14 server: %v", got)
+	}
+
+	if stopErr := served.stop(t); stopErr != nil {
+		t.Errorf("serve() = %v, want a clean return", stopErr)
+	}
+}
+
+// A host that will not say which Gerrit it is keeps every tool. Hiding one on
+// a failed probe would take a working operation away from a host behind a
+// proxy that swallows the version endpoint.
+func TestServeOffersEveryToolWhenTheVersionIsUnknown(t *testing.T) {
+	t.Parallel()
+
+	var stderr bytes.Buffer
+
+	// The stub answers 404 on every path but the version one, and this asks it
+	// for a version it will not produce.
+	served := startServe(t, envAgainst(t, ""), &stderr)
+
+	if got := toolNames(t, served.session); !slices.Contains(got, "revert_submission") {
+		t.Errorf("revert_submission was hidden on an undetermined version: %v", got)
+	}
+
+	if stopErr := served.stop(t); stopErr != nil {
+		t.Errorf("serve() = %v, want a clean return", stopErr)
+	}
+
+	// stop reads the done channel, which orders this against the probe's own
+	// goroutine.
+	if !strings.Contains(stderr.String(), "offering every tool") {
+		t.Errorf("stderr does not report the failed probe:\n%s", stderr.String())
 	}
 }
 

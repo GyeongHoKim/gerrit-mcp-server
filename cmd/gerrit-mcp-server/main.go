@@ -118,6 +118,12 @@ func serve(
 		return fmt.Errorf("serving over stdio: %w", err)
 	}
 
+	// Probed only once the transport is up. Registering tools must not make a
+	// network call, and asking Gerrit before Connect would delay the client's
+	// initialize by a round trip to a host that may not answer at all.
+	stopProbe := pruneUnsupportedTools(ctx, server, client, logger, cfg.AllowWrite)
+	defer stopProbe()
+
 	wait(ctx, session, logger)
 
 	return nil
@@ -150,5 +156,60 @@ func wait(ctx context.Context, session *mcp.ServerSession, logger *slog.Logger) 
 		// tells nobody anything they can act on.
 		_ = session.Close() //nolint:errcheck // see above
 		<-closed
+	}
+}
+
+// pruneUnsupportedTools asks Gerrit which release it is and removes the tools
+// it is too old to serve, returning a function that joins the probe.
+//
+// It runs in the background because the answer is not worth delaying the
+// session for. RemoveTools notifies the client, so an answer that arrives
+// after the first tools/list is a tools/list_changed rather than a list that
+// was wrong.
+//
+// Only a server that registered write tools probes at all: every tool with a
+// minimum version is a write tool, so a read-only server has nothing to prune
+// and makes no network call.
+//
+// The returned function cancels before it waits. The probe is blocked on an
+// HTTP request that only unwinds on cancellation, so waiting first would hold
+// shutdown open for the whole probe timeout.
+func pruneUnsupportedTools(
+	ctx context.Context,
+	server *mcp.Server,
+	client *gerrit.Client,
+	logger *slog.Logger,
+	allowWrite bool,
+) func() {
+	if !allowWrite {
+		return func() {}
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	done := make(chan struct{})
+
+	go func() {
+		defer close(done)
+
+		running, err := client.GetServerVersion(ctx)
+		if err != nil {
+			// Not a failure to serve. A host that will not say which Gerrit it
+			// is gets every tool, and one it does not have answers for itself.
+			logger.Warn("could not determine the gerrit version; offering every tool", "error", err)
+
+			return
+		}
+
+		logger.Info("gerrit version", "version", running.String())
+
+		if unsupported := mcpserver.UnsupportedTools(running); len(unsupported) > 0 {
+			server.RemoveTools(unsupported...)
+			logger.Info("hiding tools this gerrit is too old to have", "tools", unsupported)
+		}
+	}()
+
+	return func() {
+		cancel()
+		<-done
 	}
 }

@@ -6,6 +6,8 @@
 package mcpserver
 
 import (
+	"slices"
+
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/GyeongHoKim/gerrit-mcp-server/internal/gerrit"
@@ -59,6 +61,49 @@ func writeTools() []toolRegistrar {
 		registerCreateChange,
 		registerRevertSubmission,
 	}
+}
+
+// minVersions is the Gerrit release each tool needs, for the few that need
+// one at all. A tool absent from the map works on every supported version.
+//
+// The releases themselves are declared in internal/gerrit beside the endpoints
+// they describe, because they are facts about the Gerrit API rather than about
+// this server. What lives here is only which tool calls which endpoint, and
+// parity_test.go holds that equal to gerrit-cli's copy of the same claim.
+//
+// A function rather than a package-level map, for the reason readTools is one.
+func minVersions() map[string]gerrit.ServerVersion {
+	return map[string]gerrit.ServerVersion{
+		"set_work_in_progress": gerrit.MinVersionWorkInProgress,
+		"set_ready_for_review": gerrit.MinVersionWorkInProgress,
+		"revert_submission":    gerrit.MinVersionRevertSubmission,
+	}
+}
+
+// UnsupportedTools names the tools a Gerrit of this release cannot serve.
+//
+// The zero version determined nothing and hides nothing. Offering a tool that
+// fails with an explanation is better than hiding one that would have worked,
+// and an enterprise fork that backported an endpoint reports whatever release
+// it forked from.
+func UnsupportedTools(running gerrit.ServerVersion) []string {
+	if running.IsZero() {
+		return nil
+	}
+
+	var unsupported []string
+
+	for tool, needs := range minVersions() {
+		if running.Before(needs) {
+			unsupported = append(unsupported, tool)
+		}
+	}
+
+	// Sorted so that the log line a reader compares between two runs does not
+	// depend on which key Go's map iteration happened to reach first.
+	slices.Sort(unsupported)
+
+	return unsupported
 }
 
 // server carries what the tool handlers need.
