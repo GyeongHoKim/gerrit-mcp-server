@@ -140,12 +140,18 @@ func GerritCommands() []Command {
 	return append(readCommands(), writeCommands()...)
 }
 
-// metaCommands are gerrit-cli's own, and run without a Gerrit client.
+// metaCommands are gerrit-cli's own. The dispatcher hands them no Gerrit
+// client, and none of them has an MCP tool to correspond to -- which is what
+// the parity test asserts about the commands that do.
+//
+// doctor builds its own client, because "which Gerrit is this" is a question
+// about a host rather than about the tool.
 func metaCommands() []Command {
 	return []Command{
 		helpCommand(),
 		versionCommand(),
 		configCommand(),
+		doctorCommand(),
 		initCommand(),
 	}
 }
@@ -189,7 +195,7 @@ func Run(ctx context.Context, args []string, opts *Options) error {
 // a bad flag. That is the right way round: without the opt-in the command was
 // never going to run, and the refusal is the one message worth acting on.
 func runGerritCommand(ctx context.Context, command Command, args []string, opts *Options) error {
-	cfg, _, err := loadConfig(opts)
+	cfg, err := loadConfig(opts)
 	if err != nil {
 		return err
 	}
@@ -198,30 +204,40 @@ func runGerritCommand(ctx context.Context, command Command, args []string, opts 
 		return fmt.Errorf("%w: set %s=true to allow it", ErrWriteNotAllowed, config.EnvAllowWrite)
 	}
 
-	client := gerrit.New(gerrit.Options{
+	return command.Run(ctx, Deps{Gerrit: newGerritClient(cfg), Options: opts}, args)
+}
+
+// newGerritClient builds the client a loaded configuration describes.
+//
+// Shared with doctor, which is the one meta command that has a question about
+// a specific host and so cannot use the client the dispatcher withholds.
+func newGerritClient(cfg config.Config) *gerrit.Client {
+	return gerrit.New(gerrit.Options{
 		BaseURL: cfg.BaseURL,
 		User:    cfg.User,
 		Token:   cfg.Token,
 		Timeout: cfg.Timeout,
 	})
-
-	return command.Run(ctx, Deps{Gerrit: client, Options: opts}, args)
 }
 
 // loadConfig reads the configuration from the environment and, where there is
 // one to read, the configuration file.
-func loadConfig(opts *Options) (config.Config, config.Sources, error) {
+//
+// The sources LoadWithFile reports are dropped here. Only `config` shows a
+// caller where each value came from, and it asks config.Values for them
+// directly rather than going through the validation this does.
+func loadConfig(opts *Options) (config.Config, error) {
 	file, err := readConfigFile(opts)
 	if err != nil {
-		return config.Config{}, nil, err
+		return config.Config{}, err
 	}
 
-	cfg, sources, err := config.LoadWithFile(opts.Lookup, &file)
+	cfg, _, err := config.LoadWithFile(opts.Lookup, &file)
 	if err != nil {
-		return config.Config{}, sources, fmt.Errorf("reading configuration: %w", err)
+		return config.Config{}, fmt.Errorf("reading configuration: %w", err)
 	}
 
-	return cfg, sources, nil
+	return cfg, nil
 }
 
 // normalize maps the tokens a caller might reasonably type onto a command name.

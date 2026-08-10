@@ -109,7 +109,7 @@ func writeHelp(out io.Writer) error {
 	body.WriteString("\nConfiguration comes from " + config.EnvURL + ", " + config.EnvUser + " and " +
 		config.EnvToken + ", or from the file `" + ProgramName + " config` names.\n")
 	body.WriteString("A command marked with a Gerrit release fails with exit 4 on a host older than\n" +
-		"that, naming the release it needs and the one your host reports.\n")
+		"that; `" + ProgramName + " doctor` reports which release your host runs.\n")
 
 	if _, err := io.WriteString(out, body.String()); err != nil {
 		return fmt.Errorf("writing help: %w", err)

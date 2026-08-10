@@ -93,9 +93,11 @@ func TestRunRejectsHelpForAnUnknownCommand(t *testing.T) {
 func TestMetaCommandsRejectUnexpectedArguments(t *testing.T) {
 	t.Parallel()
 
-	// help takes a command name, so it is not in this set. The rest take
-	// nothing, and a caller who passed something meant something by it.
-	for _, args := range [][]string{{"version", "extra"}, {"config", "extra"}} {
+	// help takes a command name, so it is not in this set. init is not either:
+	// it refuses a non-terminal before it parses, which is its own test. The
+	// rest take nothing, and a caller who passed something meant something by
+	// it.
+	for _, args := range [][]string{{"version", "extra"}, {"config", "extra"}, {"doctor", "extra"}} {
 		t.Run(args[0], func(t *testing.T) {
 			t.Parallel()
 
