@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/GyeongHoKim/gerrit-mcp-server/internal/version"
@@ -112,11 +113,24 @@ func (e *APIError) Is(target error) bool {
 }
 
 // Client talks to one Gerrit host as one account.
+//
+// It must not be copied once used: the version memo below carries a mutex.
+// New returns a pointer for that reason, and govet's copylocks holds it.
 type Client struct {
 	baseURL    *url.URL
 	httpClient *http.Client
+	// versionErr belongs with the memo below and is placed here instead: an
+	// error is two pointer words, and govet's fieldalignment wants the
+	// struct's pointers near the front.
+	versionErr error
 	user       string
 	token      string
+
+	// The host's Gerrit release, asked for at most once. See
+	// [Client.GetServerVersion] for why the failure is remembered too.
+	versionMu     sync.Mutex
+	serverVersion ServerVersion
+	versionDone   bool
 }
 
 // Options describes the host a [Client] talks to and the account it talks as.
