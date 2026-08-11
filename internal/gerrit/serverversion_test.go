@@ -1,6 +1,7 @@
 package gerrit
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"sync/atomic"
@@ -179,6 +180,36 @@ func TestGetServerVersionRemembersAFailure(t *testing.T) {
 
 	if got := requests.Load(); got != 1 {
 		t.Errorf("requests = %d, want 1: a failure is remembered too", got)
+	}
+}
+
+// A cancelled call is the caller's failure, not the host's, so the next caller
+// with a context of its own still gets an answer. Remembering this one would
+// leave a client that dropped a single request deciding nothing from the
+// version for the rest of the session.
+func TestGetServerVersionRetriesAfterACancelledCall(t *testing.T) {
+	t.Parallel()
+
+	client := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		if _, err := w.Write([]byte(xssiPrefix + "\n\"3.14.1\"")); err != nil {
+			t.Errorf("writing test response: %v", err)
+		}
+	})
+
+	cancelled, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	if _, err := client.GetServerVersion(cancelled); err == nil {
+		t.Fatal("GetServerVersion() succeeded with a cancelled context")
+	}
+
+	got, err := client.GetServerVersion(t.Context())
+	if err != nil {
+		t.Fatalf("GetServerVersion() returned an unexpected error: %v", err)
+	}
+
+	if want := (ServerVersion{Major: 3, Minor: 14}); got != want {
+		t.Errorf("GetServerVersion() = %v, want %v", got, want)
 	}
 }
 

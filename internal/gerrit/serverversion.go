@@ -124,13 +124,29 @@ func leadingDigits(s string) string {
 // concurrent tool handlers share one probe instead of racing to make their
 // own; sync.Once would be wrong here, because it would capture whichever
 // caller arrived first along with its context.
+//
+// The one failure not remembered is a caller's own context ending, which says
+// nothing about the host. A cancelled request -- an agent that stopped
+// waiting, a session shutting down -- would otherwise answer every later call
+// for the life of the client, and the version this decides things from would
+// stay unknown until the process restarted. The probe's own timeout is a
+// different matter and is remembered: a host too slow to answer once is the
+// firewalled host this memoises for.
 func (c *Client) GetServerVersion(ctx context.Context) (ServerVersion, error) {
 	c.versionMu.Lock()
 	defer c.versionMu.Unlock()
 
 	if !c.versionDone {
+		version, err := c.fetchServerVersion(ctx)
+
+		// ctx is the caller's, not the deadline fetchServerVersion derives
+		// from it, so this is only true when the caller stopped waiting.
+		if err != nil && ctx.Err() != nil {
+			return ServerVersion{}, err
+		}
+
 		c.versionDone = true
-		c.serverVersion, c.versionErr = c.fetchServerVersion(ctx)
+		c.serverVersion, c.versionErr = version, err
 	}
 
 	return c.serverVersion, c.versionErr
