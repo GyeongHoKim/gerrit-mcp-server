@@ -115,9 +115,11 @@ their own — and `parity_test.go` holds the two equal, the same way it holds th
 
 The two frontends then act on it differently, mirroring the write split. `internal/mcpserver`
 removes the tool after connecting and lets the SDK send `tools/list_changed`, because a model
-cannot call a tool it cannot see. `internal/cli` lists the command with the release it needs and
-lets it fail, because a caller there can type any string. Neither checks before the call:
-`internal/gerrit` converts the 404, which costs no request until one has already failed.
+cannot call a tool it cannot see — one background probe per session, and only on a server that
+registered write tools, since every gated tool is a write tool. `internal/cli` lists the command
+with the release it needs and lets an invoked command fail, because a caller there can type any
+string. Neither gates the call itself: `internal/gerrit` converts the 404, which costs no request
+until one has already failed.
 
 ## Gerrit API notes
 
@@ -136,7 +138,9 @@ reference is the AsciiDoc in `doc/` — run `just fetch-gerrit-docs` to get it.
 - **Not every endpoint exists on every version.** We build and test against 3.14 and support
   **2.14+**. Only three operations are actually missing on an older host: `/wip` and `/ready`
   arrived in 2.15, `/revert_submission` in 3.2. Draft comment endpoints are *not* among them —
-  they work on 2.14 — and neither is anything else in the inventory.
+  they work on 2.14 — and neither is anything else in the inventory. The inventory comes from
+  Gerrit's own release notes; the floor itself has not been exercised against a real 2.14 host,
+  and what that leaves unverified is under [Testing](#testing).
 - **`GET /changes/{id}/message` is 3.x only.** It hands back footers Gerrit parsed for you, which
   is why it is tempting. `GET /changes/{id}/revisions/{rev}/commit` answers the same question on
   every supported release, so `GetCommitMessage` uses that one and `parseFooters` reads the git
