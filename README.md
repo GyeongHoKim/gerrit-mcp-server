@@ -301,9 +301,10 @@ earlier versions of this document blamed. Three write operations genuinely do no
 | `revert_submission` / `revert-submission` | Gerrit 3.2+ |
 
 The two frontends handle that the same way they handle write access. `gerrit-mcp-server` asks the
-host which release it is and removes the tools it cannot serve, telling the client its tool list
-changed. `gerrit-cli` lists the commands with the release each needs and reports exit 4 if you run
-one anyway, naming both the release required and the one your host reports.
+host which release it is as it starts, and never offers a tool it cannot serve, so the tool list
+your client sees is right from the first time it asks. `gerrit-cli` lists the commands with the
+release each needs and reports exit 4 if you run one anyway, naming both the release required and
+the one your host reports.
 
 **If the release cannot be determined, everything is offered.** A proxy that swallows the version
 endpoint, or a patched internal fork that backported an endpoint, should not lose an operation that

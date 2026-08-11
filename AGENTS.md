@@ -113,13 +113,14 @@ because it is a fact about the Gerrit API. Which operation calls that endpoint i
 frontend, so `minVersions()` in `internal/mcpserver` and `since(...)` in `internal/cli` each state
 their own — and `parity_test.go` holds the two equal, the same way it holds the inventory.
 
-The two frontends then act on it differently, mirroring the write split. `internal/mcpserver`
-removes the tool after connecting and lets the SDK send `tools/list_changed`, because a model
-cannot call a tool it cannot see — one background probe per session, and only on a server that
-registered write tools, since every gated tool is a write tool. `internal/cli` lists the command
-with the release it needs and lets an invoked command fail, because a caller there can type any
-string. Neither gates the call itself: `internal/gerrit` converts the 404, which costs no request
-until one has already failed.
+The two frontends then act on it differently, mirroring the write split. `gerrit-mcp-server` probes
+once before it connects the transport and does not register a tool this host is too old for, because
+a model cannot call a tool it cannot see and the first `tools/list` has to be the right answer — a
+`tools/list_changed` afterwards would reach only a client the server has already seen subscribe. One
+probe per session, and only on a server with write tools, since every gated tool is a write tool.
+`gerrit-cli` lists the command with the release it needs and lets an invoked command fail, because a
+caller there can type any string. Neither gates the call itself: `internal/gerrit` converts the 404,
+which costs no request until one has already failed.
 
 ## Gerrit API notes
 

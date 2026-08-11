@@ -115,19 +115,11 @@ func startServeWith(
 	return servedSession{session: session, done: done}
 }
 
-// A client subscribed to tools/list_changed leaves a subscriptions/listen
-// request in flight for the life of the subscription, and disconnecting
-// usually fails it with the SDK's "server is closing" -- Close cancels the
-// request and closes the connection, and the server sees whichever arrives
-// first. Either is an ordinary disconnect and must not be reported as a
-// failure to serve.
+// A subscribed client leaves a subscriptions/listen request in flight, which
+// disconnecting usually fails. That is an ordinary disconnect, not a failure to
+// serve, so only the line on stderr is asserted and not the reason on it.
 //
-// Only the line on stderr is asserted, not the reason on it, because the
-// reason is exactly the part that race decides.
-//
-// The subscription needs nothing from Gerrit: the SDK advertises
-// tools.listChanged whenever a server has any tools, so this reproduces
-// against a host that is never dialled.
+// The subscription needs nothing from Gerrit, so the host is never dialled.
 func TestServeEndsCleanlyForASubscribedClient(t *testing.T) {
 	t.Parallel()
 
@@ -368,29 +360,13 @@ func toolNames(t *testing.T, session *mcp.ClientSession) []string {
 	return names
 }
 
-// The prune happens after Connect, so the client learns about it through
-// notifications/tools/list_changed. Waiting on the notification rather than
-// polling is deliberate: that it fires at all is the load-bearing claim behind
-// pruning post-connect rather than delaying startup to probe first.
+// The removal happens before Connect, so the first list a client asks for is
+// already correct and nothing has to be announced to it afterwards. Listing
+// once is therefore the whole assertion.
 func TestServeHidesToolsAnOldGerritCannotServe(t *testing.T) {
 	t.Parallel()
 
-	changed := make(chan struct{}, 1)
-
-	served := startServeWith(t, envAgainst(t, "2.14.22"), io.Discard, &mcp.ClientOptions{
-		ToolListChangedHandler: func(context.Context, *mcp.ToolListChangedRequest) {
-			select {
-			case changed <- struct{}{}:
-			default:
-			}
-		},
-	})
-
-	select {
-	case <-changed:
-	case <-t.Context().Done():
-		t.Fatal("the server never announced a change to its tool list")
-	}
+	served := startServe(t, envAgainst(t, "2.14.22"), io.Discard)
 
 	got := toolNames(t, served.session)
 
@@ -411,9 +387,7 @@ func TestServeHidesToolsAnOldGerritCannotServe(t *testing.T) {
 	}
 }
 
-// A current Gerrit gets everything, and says nothing about it. The assertion
-// that matters is the tool list; the absence of a notification is not worth
-// waiting on a timeout to prove.
+// A current Gerrit gets everything.
 func TestServeKeepsEveryToolOnACurrentGerrit(t *testing.T) {
 	t.Parallel()
 

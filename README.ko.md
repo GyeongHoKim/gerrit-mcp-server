@@ -14,7 +14,7 @@ AI 코딩 에이전트를 Gerrit Code Review 시스템에 연결할 수 있습�
 | | 설명 | 컨텍스트 비용 |
 | --- | --- | --- |
 | **`gerrit-cli` + 스킬** | 명령줄 바이너리와, 이를 사용하도록 에이전트를 가르치는 [에이전트 스킬](skills/gerrit-cli/SKILL.md) | 스킬이 실행되기 전까지 한 줄 |
-| **`gerrit-mcp-server`** | **stdio**를 사용하는 [Model Context Protocol](https://modelcontextprotocol.io) 서버 | 전체 세션 동안 22개의 도구 스키마 |
+| **`gerrit-mcp-server`** | **stdio**를 사용하는 [Model Context Protocol](https://modelcontextprotocol.io) 서버 | 전체 세션 동안 22개의 툴 스키마 |
 
 스킬 방식은 더 가볍고 스킬을 읽는 모든 에이전트에서 동작합니다. MCP 서버는 셸 접근이 필요 없으며 Claude Code, Codex, Cursor, Zed, Continue 또는 직접 만든 MCP 클라이언트에서 사용할 수 있습니다.
 
@@ -186,7 +186,7 @@ Gerrit은 계정 설정에서 발급한 토큰을 사용해 HTTP Basic으로 RES
 | `GERRIT_URL` | 예 | — | Gerrit 호스트의 기본 URL. 예: `https://gerrit.example.com` |
 | `GERRIT_USER` | 예 | — | Gerrit 사용자 이름 |
 | `GERRIT_TOKEN` | 예 | — | *Settings → HTTP Credentials*에서 발급한 인증 토큰 |
-| `GERRIT_ALLOW_WRITE` | 아니요 | `false` | Gerrit을 변경하는 도구와 명령을 활성화하려면 `true`로 설정 |
+| `GERRIT_ALLOW_WRITE` | 아니요 | `false` | Gerrit을 변경하는 툴과 명령을 활성화하려면 `true`로 설정 |
 | `GERRIT_TIMEOUT` | 아니요 | `30s` | 요청별 타임아웃 |
 | `GERRIT_LOG_LEVEL` | 아니요 | `info` | `debug`, `info`, `warn`, `error` 중 하나. 로그는 stderr로 출력 |
 | `GERRIT_CONFIG` | 아니요 | — | `gerrit-cli` 전용. 기본값을 덮어쓰는 설정 파일 경로 |
@@ -195,13 +195,13 @@ Gerrit은 계정 설정에서 발급한 토큰을 사용해 HTTP Basic으로 RES
 
 CLI와 MCP 서버 둘 다 command 와 tool이 1:1 대응관계입니다. 예를 들어 `query_changes`는 `query-changes`가 되며, `gerrit-cli`는 두 표기법을 모두 허용합니다.
 
-읽기 작업은 항상 사용할 수 있습니다. **쓰기 작업은 `GERRIT_ALLOW_WRITE=true`로 설정하기 전까지 비활성화됩니다.** 따라서 에이전트가 실수로 변경 사항을 abandon하거나 리뷰를 등록할 수 없습니다. MCP 서버는 쓰기 도구 자체를 등록하지 않으며, `gerrit-cli`는 도움말에는 표시하되 비활성 상태로 표시하고 실행을 거부합니다.
+읽기 작업은 항상 사용할 수 있습니다. **쓰기 작업은 `GERRIT_ALLOW_WRITE=true`로 설정하기 전까지 비활성화됩니다.** 따라서 에이전트가 실수로 변경 사항을 abandon하거나 리뷰를 등록할 수 없습니다. MCP 서버는 쓰기 툴 자체를 등록하지 않으며, `gerrit-cli`는 도움말에는 표시하되 비활성 상태로 표시하고 실행을 거부합니다.
 
 호스트의 Gerrit이 너무 오래되어 없는 작업에도 같은 비대칭이 적용됩니다. [Supported Gerrit versions](#supported-gerrit-versions)를 참고하세요.
 
 ### Read
 
-| 도구 | 설명 |
+| 툴 | 설명 |
 | --- | --- |
 | `query_changes` | Gerrit 쿼리 문법으로 변경 사항 검색 (`status:open owner:self`) |
 | `get_change_details` | 변경 사항 하나의 전체 요약 |
@@ -216,11 +216,11 @@ CLI와 MCP 서버 둘 다 command 와 tool이 1:1 대응관계입니다. 예를 
 
 모든 값은 플래그로 지정합니다. `gerrit-cli`에는 위치 인자가 없습니다. 특정 명령의 플래그는 `gerrit-cli help <command>`로 확인하세요. 문서 업데이트를 깜빡하고 안할 수도 있어서 이 명령어 응답내용이 문서보다 더 정확할 수도 있습니다.
 
-`gerrit-cli`에는 대응하는 MCP 도구가 없는 자체 명령이 다섯 개 있습니다. `help`, `version`, `config`, `init`, 그리고 호스트의 Gerrit 릴리스와 그로 인해 못 쓰는 작업을 알려주는 `doctor`입니다.
+`gerrit-cli`에는 대응하는 MCP 툴이 없는 자체 명령이 다섯 개 있습니다. `help`, `version`, `config`, `init`, 그리고 호스트의 Gerrit 릴리스와 그로 인해 못 쓰는 작업을 알려주는 `doctor`입니다.
 
 ### Write — requires `GERRIT_ALLOW_WRITE=true`
 
-| 도구 | 설명 |
+| 툴 | 설명 |
 | --- | --- |
 | `post_review_comment` | 줄에 초안 댓글을 추가하거나 스레드에 답글 작성 |
 | `publish_drafts` | 초안 댓글을 리뷰로 게시 |
@@ -261,7 +261,7 @@ Gerrit **3.14** REST API를 기준으로 빌드하고 테스트했으며, **2.14
 | `set_ready_for_review` / `set-ready-for-review` | Gerrit 2.15+ |
 | `revert_submission` / `revert-submission` | Gerrit 3.2+ |
 
-두 프론트엔드는 이를 쓰기 권한과 같은 방식으로 처리합니다. `gerrit-mcp-server`는 호스트에 릴리스를 물어보고 제공할 수 없는 도구를 제거한 뒤 도구 목록이 바뀌었음을 클라이언트에 알립니다. `gerrit-cli`는 각 명령에 필요한 릴리스를 함께 표시하고, 그래도 실행하면 필요한 릴리스와 호스트가 보고한 릴리스를 모두 알려주며 exit 4로 종료합니다.
+두 프론트엔드는 이를 쓰기 권한과 같은 방식으로 처리합니다. `gerrit-mcp-server`는 시작할 때 호스트에 릴리스를 물어보고 제공할 수 없는 툴은 아예 등록하지 않으므로, 클라이언트가 처음 물어보는 순간부터 툴 목록이 정확합니다. `gerrit-cli`는 각 명령에 필요한 릴리스를 함께 표시하고, 그래도 실행하면 필요한 릴리스와 호스트가 보고한 릴리스를 모두 알려주며 exit 4로 종료합니다.
 
 **릴리스를 알아낼 수 없으면 전부 제공합니다.** 버전 엔드포인트를 가로막는 프록시나, 엔드포인트를 백포트한 사내 포크에서 멀쩡히 동작하는 작업을 잃어서는 안 되기 때문입니다. 따라서 버전 불명은 아무것도 숨기지 않으며, 정말 없는 기능은 그때 명확한 메시지와 함께 실패합니다.
 
