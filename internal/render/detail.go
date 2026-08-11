@@ -24,7 +24,27 @@ func ChangeDetail(detail *gerrit.ChangeDetail) string {
 	var out strings.Builder
 
 	writeChange(&out, &detail.ChangeInfo)
-	out.WriteString("\n")
+
+	// Both of the lines below are optional, so the blank line that separates
+	// them from the change block is only worth writing when one of them
+	// appeared. Built separately rather than guarded twice: on an older Gerrit
+	// with no Change-Id in the payload, neither is written and the output
+	// would otherwise end on a stray blank line.
+	if meta := changeMeta(detail); meta != "" {
+		out.WriteString("\n")
+		out.WriteString(meta)
+	}
+
+	writeLabels(&out, detail.Labels)
+	writeReviewers(&out, detail.Reviewers)
+
+	return out.String()
+}
+
+// changeMeta renders the change's identity and comment counts, either of which
+// Gerrit may not have sent.
+func changeMeta(detail *gerrit.ChangeDetail) string {
+	var out strings.Builder
 
 	if detail.ChangeID != "" {
 		out.WriteString("Change-Id: ")
@@ -32,16 +52,30 @@ func ChangeDetail(detail *gerrit.ChangeDetail) string {
 		out.WriteString("\n")
 	}
 
-	out.WriteString("Comments: ")
-	out.WriteString(strconv.Itoa(detail.TotalCommentCount))
-	out.WriteString(" total, ")
-	out.WriteString(strconv.Itoa(detail.UnresolvedCommentCount))
-	out.WriteString(" unresolved\n")
-
-	writeLabels(&out, detail.Labels)
-	writeReviewers(&out, detail.Reviewers)
+	// Gerrit did not report comment counts before 3.0. Saying nothing is the
+	// honest answer there; "0 total" would be a number we made up.
+	//
+	// Only the total is required. If a host ever omits the unresolved count
+	// when it is zero, demanding both would drop the line from every change
+	// with nothing outstanding.
+	if detail.TotalCommentCount != nil {
+		out.WriteString("Comments: ")
+		out.WriteString(strconv.Itoa(*detail.TotalCommentCount))
+		out.WriteString(" total, ")
+		out.WriteString(strconv.Itoa(count(detail.UnresolvedCommentCount)))
+		out.WriteString(" unresolved\n")
+	}
 
 	return out.String()
+}
+
+// count reads an optional count, treating an absent one as zero.
+func count(value *int) int {
+	if value == nil {
+		return 0
+	}
+
+	return *value
 }
 
 // writeLabels appends the vote state, sorted by label name.

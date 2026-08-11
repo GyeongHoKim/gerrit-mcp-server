@@ -240,8 +240,7 @@ func TestGetCommitMessageTool(t *testing.T) {
 
 	const body = `{
 	  "subject": "Add feature X",
-	  "full_message": "Add feature X\n\nFeature X helps with foo.\n\nBug: 123\n",
-	  "footers": {"Bug": "123"}
+	  "message": "Add feature X\n\nFeature X helps with foo.\n\nBug: 123\n"
 	}`
 
 	var gotPath string
@@ -260,7 +259,7 @@ func TestGetCommitMessageTool(t *testing.T) {
 		t.Fatalf("get_commit_message reported an error: %s", resultText(t, result))
 	}
 
-	if want := "/a/changes/12345/message"; gotPath != want {
+	if want := "/a/changes/12345/revisions/current/commit"; gotPath != want {
 		t.Errorf("path = %q, want %q", gotPath, want)
 	}
 
@@ -270,7 +269,7 @@ func TestGetCommitMessageTool(t *testing.T) {
 		t.Errorf("output lost the message body:\n%s", got)
 	}
 
-	if strings.Contains(got, "full_message") {
+	if strings.Contains(got, "\"message\"") {
 		t.Errorf("output leaks raw Gerrit JSON:\n%s", got)
 	}
 }
@@ -519,8 +518,7 @@ func TestGetBugsFromCLTool(t *testing.T) {
 
 	const body = `{
 	  "subject": "Add feature X",
-	  "full_message": "Add feature X\n\nBug: 123\nFixes: 456\nChange-Id: I1\n",
-	  "footers": {"Bug": "123", "Fixes": "456", "Change-Id": "I1"}
+	  "message": "Add feature X\n\nBug: 123\nFixes: 456\nChange-Id: I1\n"
 	}`
 
 	var gotPath string
@@ -539,9 +537,10 @@ func TestGetBugsFromCLTool(t *testing.T) {
 		t.Fatalf("get_bugs_from_cl reported an error: %s", resultText(t, result))
 	}
 
-	// Gerrit parses the footers for us, so this rides on /message rather than
-	// re-parsing the prose.
-	if want := "/a/changes/12345/message"; gotPath != want {
+	// The revision's commit rather than /message: the latter would hand us the
+	// footers already parsed, but it does not exist before Gerrit 3.0, so the
+	// trailers are parsed from the message text instead.
+	if want := "/a/changes/12345/revisions/current/commit"; gotPath != want {
 		t.Errorf("path = %q, want %q", gotPath, want)
 	}
 

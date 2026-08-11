@@ -2,10 +2,12 @@ package cli
 
 import (
 	"errors"
+	"net/http"
 	"strings"
 	"testing"
 
 	"github.com/GyeongHoKim/gerrit-mcp-server/internal/config"
+	"github.com/GyeongHoKim/gerrit-mcp-server/internal/gerrit"
 )
 
 // TestWriteCommandsNeverReachGerritWithoutTheOptIn is the test that costs
@@ -78,6 +80,77 @@ func TestWriteCommandsRunWithTheOptIn(t *testing.T) {
 // TestWriteCommandsAreAllMarked is the complement of the gate: a command that
 // mutates Gerrit but is left out of writeCommands would be registered as a
 // read, and would run without the opt-in.
+// The commands that carry a minimum version, and the flags that reach them.
+func versionGatedInvocations() map[string][]string {
+	return map[string][]string{
+		"set-work-in-progress": {"--change-id", "12345"},
+		"set-ready-for-review": {"--change-id", "12345"},
+		"revert-submission":    {"--change-id", "12345"},
+	}
+}
+
+// End to end on the frontend a person types into: an old host answers 404,
+// internal/gerrit turns that into a sentence naming both releases, and the
+// exit code says to stop rather than to fix the arguments.
+func TestVersionGatedCommandsReportAnOldServer(t *testing.T) {
+	t.Parallel()
+
+	for name, flags := range versionGatedInvocations() {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			handler := func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.EscapedPath() != "/a/config/server/version" {
+					w.WriteHeader(http.StatusNotFound)
+
+					return
+				}
+
+				if _, err := w.Write([]byte(")]}'\n\"2.14.22\"")); err != nil {
+					t.Errorf("writing test response: %v", err)
+				}
+			}
+
+			got := runCLIWith(t, handler, allowWrites(), append([]string{name}, flags...)...)
+
+			if !errors.Is(got.err, gerrit.ErrUnsupportedByServer) {
+				t.Fatalf("%s error = %v, want ErrUnsupportedByServer", name, got.err)
+			}
+
+			if code := ExitCode(got.err); code != ExitNotPermitted {
+				t.Errorf("%s exit code = %d, want %d", name, code, ExitNotPermitted)
+			}
+
+			// Both releases: the one the command needs and the one the host
+			// admits to. Either alone leaves the reader without the next step.
+			for _, want := range []string{"2.14", "or newer"} {
+				if !strings.Contains(got.err.Error(), want) {
+					t.Errorf("%s error = %q, want it to mention %q", name, got.err, want)
+				}
+			}
+		})
+	}
+}
+
+// Every version-gated command is a write command. gerrit-cli does not depend
+// on that the way the MCP server does, but the two frontends describing the
+// same operations differently would be its own bug.
+func TestVersionGatedCommandsAreWriteCommands(t *testing.T) {
+	t.Parallel()
+
+	gated := versionGatedInvocations()
+
+	for _, command := range GerritCommands() {
+		if _, want := gated[command.Name]; want != !command.MinVersion.IsZero() {
+			t.Errorf("%s has a minimum version = %t, want %t", command.Name, !want, want)
+		}
+
+		if _, isGated := gated[command.Name]; isGated && !command.Write {
+			t.Errorf("%s carries a minimum version but is not a write command", command.Name)
+		}
+	}
+}
+
 func TestWriteCommandsAreAllMarked(t *testing.T) {
 	t.Parallel()
 

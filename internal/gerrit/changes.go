@@ -208,17 +208,21 @@ type ChangeDetail struct {
 	Labels map[string]LabelInfo `json:"labels,omitempty"`
 	// Reviewers is keyed by state: REVIEWER, CC or REMOVED.
 	Reviewers map[string][]AccountInfo `json:"reviewers,omitempty"`
+	// TotalCommentCount counts every comment on the change.
+	//
+	// A pointer because Gerrit before 3.0 does not send these at all, and an
+	// absent count is not a count of zero: printing "0 total" for a change
+	// with fifty comments is worse than not printing the line.
+	TotalCommentCount *int `json:"total_comment_count,omitempty"`
+	// UnresolvedCommentCount counts the comments still marked unresolved, and
+	// is absent on the same servers as the total above.
+	UnresolvedCommentCount *int `json:"unresolved_comment_count,omitempty"`
 	// ChangeID is the Change-Id footer from the commit message.
 	ChangeID string `json:"change_id"`
 	// Embedded after the pointer-bearing fields so the struct's scannable
 	// prefix stays short. Field order has no bearing on the JSON, which is
 	// keyed by name.
 	ChangeInfo
-
-	// TotalCommentCount counts every comment on the change.
-	TotalCommentCount int `json:"total_comment_count"`
-	// UnresolvedCommentCount counts the comments still marked unresolved.
-	UnresolvedCommentCount int `json:"unresolved_comment_count"`
 }
 
 // ErrEmptyChangeID reports a call with no change to act on.
@@ -241,29 +245,50 @@ func (c *Client) GetChange(ctx context.Context, changeID string) (*ChangeDetail,
 }
 
 // CommitMessageInfo is a change's commit message with its footers parsed out.
+//
+// It carries no JSON tags because it is assembled rather than decoded: see
+// [Client.GetCommitMessage] for why the footers are parsed here.
 type CommitMessageInfo struct {
 	// Footers maps footer keys such as Bug or Change-Id to their values.
-	Footers map[string]string `json:"footers,omitempty"`
+	Footers map[string]string
 	// Subject is the first line of the message.
-	Subject string `json:"subject"`
+	Subject string
 	// FullMessage is the complete commit message, subject included.
-	FullMessage string `json:"full_message"`
+	FullMessage string
+}
+
+// commitInfo is the part of Gerrit's CommitInfo the commit message needs.
+type commitInfo struct {
+	// Subject is the header line of the commit message.
+	Subject string `json:"subject"`
+	// Message is the complete commit message.
+	Message string `json:"message"`
 }
 
 // GetCommitMessage retrieves the commit message of a change's current patch
 // set.
+//
+// This reads the revision's commit rather than GET /changes/{id}/message, and
+// parses the footers itself with [parseFooters]. Both endpoints answer the
+// same question, but /message arrived in Gerrit 3.0 while the revision's
+// commit has been there throughout, so taking the older one is what keeps a
+// single code path across every version this supports.
 func (c *Client) GetCommitMessage(ctx context.Context, changeID string) (*CommitMessageInfo, error) {
 	changeID = strings.TrimSpace(changeID)
 	if changeID == "" {
 		return nil, ErrEmptyChangeID
 	}
 
-	var message CommitMessageInfo
-	if err := c.do(ctx, http.MethodGet, changePath(changeID, "/message"), nil, nil, &message); err != nil {
+	var commit commitInfo
+	if err := c.do(ctx, http.MethodGet, revisionPath(changeID, "/commit"), nil, nil, &commit); err != nil {
 		return nil, err
 	}
 
-	return &message, nil
+	return &CommitMessageInfo{
+		Footers:     parseFooters(commit.Message),
+		Subject:     commit.Subject,
+		FullMessage: commit.Message,
+	}, nil
 }
 
 // ChangesSubmittedTogether lists every change that would be submitted along

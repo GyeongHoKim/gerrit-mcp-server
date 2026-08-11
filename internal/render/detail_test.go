@@ -1,6 +1,7 @@
 package render_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/GyeongHoKim/gerrit-mcp-server/internal/gerrit"
@@ -10,44 +11,54 @@ import (
 func TestChangeDetail(t *testing.T) {
 	t.Parallel()
 
-	tests := map[string]*gerrit.ChangeDetail{
-		"detail_full": {
-			ChangeInfo: gerrit.ChangeInfo{
-				Number:     12345,
-				Project:    "platform/base",
-				Branch:     "main",
-				Subject:    "fix the widget alignment",
-				Status:     "NEW",
-				Updated:    at(t, "2026-07-31 06:04:05.000000000"),
-				Owner:      gerrit.AccountInfo{Name: "Alice Adams", AccountID: 1},
-				Insertions: 42,
-				Deletions:  3,
-			},
-			ChangeID:               "I8473b95934b5732ac55d26311a706c9c2bde9940",
-			TotalCommentCount:      5,
-			UnresolvedCommentCount: 2,
-			Labels: map[string]gerrit.LabelInfo{
-				// Deliberately out of alphabetical order: the rendering has to
-				// sort, or the output changes between runs.
-				"Verified": {All: []gerrit.ApprovalInfo{
-					{AccountInfo: gerrit.AccountInfo{Name: "CI Bot", AccountID: 9}, Value: 1},
-				}},
-				"Code-Review": {All: []gerrit.ApprovalInfo{
-					{AccountInfo: gerrit.AccountInfo{Name: "Bob Brown", AccountID: 2}, Value: 2},
-					{AccountInfo: gerrit.AccountInfo{Name: "Carol Chen", AccountID: 3}, Value: -1},
-					// A zero vote means the reviewer has not scored, so it is
-					// noise rather than information.
-					{AccountInfo: gerrit.AccountInfo{Name: "Dave Davis", AccountID: 4}, Value: 0},
-				}},
-			},
-			Reviewers: map[string][]gerrit.AccountInfo{
-				"REVIEWER": {
-					{Name: "Bob Brown", AccountID: 2},
-					{Name: "Carol Chen", AccountID: 3},
-				},
-				"CC": {{Name: "Dave Davis", AccountID: 4}},
-			},
+	// detail_2x is detail_full as a Gerrit older than 3.0 answers it: the same
+	// change, with no comment counts in the payload. It is built from the same
+	// literal below so that the two goldens can only differ by that line.
+	full := &gerrit.ChangeDetail{
+		ChangeInfo: gerrit.ChangeInfo{
+			Number:     12345,
+			Project:    "platform/base",
+			Branch:     "main",
+			Subject:    "fix the widget alignment",
+			Status:     "NEW",
+			Updated:    at(t, "2026-07-31 06:04:05.000000000"),
+			Owner:      gerrit.AccountInfo{Name: "Alice Adams", AccountID: 1},
+			Insertions: 42,
+			Deletions:  3,
 		},
+		ChangeID:               "I8473b95934b5732ac55d26311a706c9c2bde9940",
+		TotalCommentCount:      new(5),
+		UnresolvedCommentCount: new(2),
+		Labels: map[string]gerrit.LabelInfo{
+			// Deliberately out of alphabetical order: the rendering has to
+			// sort, or the output changes between runs.
+			"Verified": {All: []gerrit.ApprovalInfo{
+				{AccountInfo: gerrit.AccountInfo{Name: "CI Bot", AccountID: 9}, Value: 1},
+			}},
+			"Code-Review": {All: []gerrit.ApprovalInfo{
+				{AccountInfo: gerrit.AccountInfo{Name: "Bob Brown", AccountID: 2}, Value: 2},
+				{AccountInfo: gerrit.AccountInfo{Name: "Carol Chen", AccountID: 3}, Value: -1},
+				// A zero vote means the reviewer has not scored, so it is
+				// noise rather than information.
+				{AccountInfo: gerrit.AccountInfo{Name: "Dave Davis", AccountID: 4}, Value: 0},
+			}},
+		},
+		Reviewers: map[string][]gerrit.AccountInfo{
+			"REVIEWER": {
+				{Name: "Bob Brown", AccountID: 2},
+				{Name: "Carol Chen", AccountID: 3},
+			},
+			"CC": {{Name: "Dave Davis", AccountID: 4}},
+		},
+	}
+
+	old := *full
+	old.TotalCommentCount = nil
+	old.UnresolvedCommentCount = nil
+
+	tests := map[string]*gerrit.ChangeDetail{
+		"detail_full": full,
+		"detail_2x":   &old,
 		"detail_minimal": {
 			ChangeInfo: gerrit.ChangeInfo{
 				Number:  1,
@@ -80,6 +91,42 @@ func TestChangeDetail(t *testing.T) {
 			t.Parallel()
 
 			golden(t, name, render.ChangeDetail(detail))
+		})
+	}
+}
+
+// A count of zero and no count at all are different answers, and the whole
+// reason these fields are pointers. Golden files pin the absent case; this
+// pins that a real zero still prints, so that nobody "simplifies" the render
+// into skipping the line whenever the number is zero.
+func TestChangeDetailDistinguishesZeroCommentsFromNone(t *testing.T) {
+	t.Parallel()
+
+	base := gerrit.ChangeInfo{Number: 1, Project: "p", Branch: "main", Subject: "s", Status: "NEW"}
+
+	tests := map[string]struct {
+		detail *gerrit.ChangeDetail
+		want   string
+	}{
+		"a change nobody has commented on": {
+			detail: &gerrit.ChangeDetail{ChangeInfo: base, TotalCommentCount: new(0)},
+			want:   "Comments: 0 total, 0 unresolved\n",
+		},
+		// If a host ever sends the total and omits the unresolved count when it
+		// is zero, the line still has to appear.
+		"a total without an unresolved count": {
+			detail: &gerrit.ChangeDetail{ChangeInfo: base, TotalCommentCount: new(4)},
+			want:   "Comments: 4 total, 0 unresolved\n",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := render.ChangeDetail(test.detail); !strings.Contains(got, test.want) {
+				t.Errorf("ChangeDetail() = %q, want it to contain %q", got, test.want)
+			}
 		})
 	}
 }

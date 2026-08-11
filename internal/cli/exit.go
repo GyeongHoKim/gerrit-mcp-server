@@ -70,6 +70,10 @@ var exitCodes = []struct {
 	{config.ErrInvalid, ExitNotConfigured},
 
 	{ErrWriteNotAllowed, ExitNotPermitted},
+	// Not permitted by the host rather than by the account, but the same
+	// answer either way: this is not going to work, and no retry or change of
+	// arguments will make it.
+	{gerrit.ErrUnsupportedByServer, ExitNotPermitted},
 	{gerrit.ErrUnauthorized, ExitNotPermitted},
 	{gerrit.ErrForbidden, ExitNotPermitted},
 

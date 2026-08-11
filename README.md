@@ -228,6 +228,9 @@ Reads are always available. **Writes are off unless you set `GERRIT_ALLOW_WRITE=
 agent cannot abandon a change or post a review by accident. The MCP server does not register the
 write tools at all; `gerrit-cli` still lists them in its help, marked, but refuses to run one.
 
+The same asymmetry applies to operations your Gerrit is too old for — see
+[Supported Gerrit versions](#supported-gerrit-versions).
+
 ### Read
 
 | Tool | Description |
@@ -246,6 +249,9 @@ write tools at all; `gerrit-cli` still lists them in its help, marked, but refus
 Every value is a flag; `gerrit-cli` has no positional arguments. Run `gerrit-cli help <command>`
 for one command's flags — that is authoritative and cannot go stale.
 
+`gerrit-cli` also has five commands of its own that no MCP tool corresponds to: `help`, `version`,
+`config`, `init`, and `doctor`, which reports your host's Gerrit release and what that rules out.
+
 There is deliberately **no `--json` output**. Everything passes through the same renderer that keeps
 responses inside a sensible token budget, and handing an agent raw Gerrit JSON would undo that.
 
@@ -259,12 +265,12 @@ responses inside a sensible token budget, and handing an agent raw Gerrit JSON w
 | `delete_draft_comments` | Delete every draft on a change |
 | `add_reviewer` | Add a reviewer or CC |
 | `set_topic` | Set or clear the topic |
-| `set_ready_for_review` | Take a change out of WIP |
-| `set_work_in_progress` | Mark a change WIP |
+| `set_ready_for_review` | Take a change out of WIP (needs Gerrit 2.15+) |
+| `set_work_in_progress` | Mark a change WIP (needs Gerrit 2.15+) |
 | `create_change` | Create a change |
 | `abandon_change` | Abandon a change |
 | `revert_change` | Revert a change |
-| `revert_submission` | Revert a whole submission |
+| `revert_submission` | Revert a whole submission (needs Gerrit 3.2+) |
 
 ## Exit codes
 
@@ -277,14 +283,39 @@ stdout and everything else to stderr, so the answer is safe to pipe.
 | 1 | Something else failed; read stderr |
 | 2 | Bad arguments |
 | 3 | Not configured — run `gerrit-cli init` |
-| 4 | Not permitted — the account, or `GERRIT_ALLOW_WRITE` |
+| 4 | Not permitted — the account, `GERRIT_ALLOW_WRITE`, or a Gerrit too old for this operation |
 | 5 | No such change, file or comment |
 | 6 | The change is not in a state that allows this |
 
 ## Supported Gerrit versions
 
-Built against the Gerrit **3.14** REST API and tested against it. Expected to work with **3.12 and
-newer**; older versions are missing some of the draft comment endpoints.
+Built and tested against the Gerrit **3.14** REST API. Supported down to **2.14**.
+
+Almost everything works unchanged on an old host — including the draft comment endpoints, which
+earlier versions of this document blamed. Three write operations genuinely do not exist:
+
+| Operation | Needs |
+| --- | --- |
+| `set_work_in_progress` / `set-work-in-progress` | Gerrit 2.15+ |
+| `set_ready_for_review` / `set-ready-for-review` | Gerrit 2.15+ |
+| `revert_submission` / `revert-submission` | Gerrit 3.2+ |
+
+The two frontends handle that the same way they handle write access. `gerrit-mcp-server` asks the
+host which release it is and removes the tools it cannot serve, telling the client its tool list
+changed. `gerrit-cli` lists the commands with the release each needs and reports exit 4 if you run
+one anyway, naming both the release required and the one your host reports.
+
+**If the release cannot be determined, everything is offered.** A proxy that swallows the version
+endpoint, or a patched internal fork that backported an endpoint, should not lose an operation that
+works — so an unknown version hides nothing, and anything genuinely missing still fails with a
+clear message.
+
+One more difference worth knowing: Gerrit did not report comment counts before 3.0, so
+`get_change_details` omits that line on an older host rather than claiming zero.
+
+```bash
+gerrit-cli doctor    # which release your host runs, and what that rules out
+```
 
 ## Other ways to install
 

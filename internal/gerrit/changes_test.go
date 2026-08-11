@@ -368,8 +368,8 @@ func TestGetChange(t *testing.T) {
 		t.Errorf("ChangeID = %q, want the Change-Id footer", got.ChangeID)
 	}
 
-	if got.UnresolvedCommentCount != 2 {
-		t.Errorf("UnresolvedCommentCount = %d, want 2", got.UnresolvedCommentCount)
+	if got.UnresolvedCommentCount == nil || *got.UnresolvedCommentCount != 2 {
+		t.Errorf("UnresolvedCommentCount = %v, want 2", got.UnresolvedCommentCount)
 	}
 
 	// The embedded ChangeInfo must decode alongside the detail-only fields.
@@ -399,6 +399,39 @@ func TestGetChangeRejectsEmptyID(t *testing.T) {
 	}
 }
 
+// Gerrit did not report comment counts before 3.0, so a detail from a 2.x
+// host simply has no such keys. They have to come back absent rather than
+// zero, or every change on an old server would claim to have no comments.
+func TestGetChangeLeavesAbsentCommentCountsUnset(t *testing.T) {
+	t.Parallel()
+
+	const body = `{
+	  "id": "p~1", "project": "p", "branch": "main", "subject": "s",
+	  "status": "NEW", "_number": 1, "change_id": "Iabc",
+	  "updated": "2026-07-31 06:04:05.000000000",
+	  "owner": {"_account_id": 1, "name": "Alice Adams"}
+	}`
+
+	client := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		if _, err := w.Write([]byte(xssiPrefix + "\n" + body)); err != nil {
+			t.Errorf("writing test response: %v", err)
+		}
+	})
+
+	got, err := client.GetChange(t.Context(), "1")
+	if err != nil {
+		t.Fatalf("GetChange() returned an unexpected error: %v", err)
+	}
+
+	if got.TotalCommentCount != nil {
+		t.Errorf("TotalCommentCount = %d, want it unset", *got.TotalCommentCount)
+	}
+
+	if got.UnresolvedCommentCount != nil {
+		t.Errorf("UnresolvedCommentCount = %d, want it unset", *got.UnresolvedCommentCount)
+	}
+}
+
 func TestGetChangeMapsNotFound(t *testing.T) {
 	t.Parallel()
 
@@ -414,10 +447,14 @@ func TestGetChangeMapsNotFound(t *testing.T) {
 func TestGetCommitMessage(t *testing.T) {
 	t.Parallel()
 
+	// A CommitInfo, which is what the revision endpoint answers on every
+	// supported version. The footers are not in the payload: Gerrit only
+	// parses them for the 3.x-only /message endpoint, so parseFooters has to
+	// produce the same map from the message text below.
 	const body = `{
+	  "commit": "674ac754f91e64a0efb8087e59a176484bd534d1",
 	  "subject": "Add feature X",
-	  "full_message": "Add feature X\n\nFeature X helps with foo.\n\nBug: 123\nChange-Id: I1039447\n",
-	  "footers": {"Bug": "123", "Change-Id": "I1039447"}
+	  "message": "Add feature X\n\nFeature X helps with foo.\n\nBug: 123\nChange-Id: I1039447\n"
 	}`
 
 	var gotPath string
@@ -435,7 +472,7 @@ func TestGetCommitMessage(t *testing.T) {
 		t.Fatalf("GetCommitMessage() returned an unexpected error: %v", err)
 	}
 
-	if want := "/a/changes/a%2Fb~main~I1/message"; gotPath != want {
+	if want := "/a/changes/a%2Fb~main~I1/revisions/current/commit"; gotPath != want {
 		t.Errorf("path = %q, want %q", gotPath, want)
 	}
 
@@ -449,6 +486,10 @@ func TestGetCommitMessage(t *testing.T) {
 
 	if want := "123"; got.Footers["Bug"] != want {
 		t.Errorf("Footers[Bug] = %q, want %q", got.Footers["Bug"], want)
+	}
+
+	if want := "I1039447"; got.Footers["Change-Id"] != want {
+		t.Errorf("Footers[Change-Id] = %q, want %q", got.Footers["Change-Id"], want)
 	}
 }
 
