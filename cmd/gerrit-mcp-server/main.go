@@ -134,10 +134,15 @@ func serve(
 // How a session ended is logged rather than returned. On stdio there is one
 // client and one way for a session to end -- the other end went away -- so a
 // broken pipe is a diagnostic and not an exit status. A client subscribed to
-// tools/list_changed always ends this way: its subscription is a
+// tools/list_changed usually ends this way: its subscription is a
 // subscriptions/listen request the server holds open for the subscription's
-// lifetime, and disconnecting fails that request however cleanly the client
-// left.
+// lifetime, and disconnecting fails that request unless the cancellation the
+// client sends first happens to arrive before the connection closes.
+//
+// Which of those two the client wins is a race inside the SDK and not
+// something an operator can act on, so the line is written either way and the
+// reason is what varies. A session that ends silently is the one shape of
+// this a reader cannot tell from a hang.
 //
 // A cancelled context closes the session rather than abandoning it, and the
 // goroutine waiting on it is joined either way.
@@ -150,6 +155,8 @@ func wait(ctx context.Context, session *mcp.ServerSession, logger *slog.Logger) 
 	case err := <-closed:
 		if err != nil {
 			logger.Info("the client disconnected", "reason", err)
+		} else {
+			logger.Info("the client disconnected")
 		}
 	case <-ctx.Done():
 		// The error is the session's own; a close that fails on the way out

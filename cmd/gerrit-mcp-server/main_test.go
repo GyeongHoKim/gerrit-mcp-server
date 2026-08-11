@@ -116,9 +116,14 @@ func startServeWith(
 }
 
 // A client subscribed to tools/list_changed leaves a subscriptions/listen
-// request in flight for the life of the subscription, so disconnecting always
-// fails it with the SDK's "server is closing". That is an ordinary disconnect
-// and must not be reported as a failure to serve.
+// request in flight for the life of the subscription, and disconnecting
+// usually fails it with the SDK's "server is closing" -- Close cancels the
+// request and closes the connection, and the server sees whichever arrives
+// first. Either is an ordinary disconnect and must not be reported as a
+// failure to serve.
+//
+// Only the line on stderr is asserted, not the reason on it, because the
+// reason is exactly the part that race decides.
 //
 // The subscription needs nothing from Gerrit: the SDK advertises
 // tools.listChanged whenever a server has any tools, so this reproduces
