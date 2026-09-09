@@ -31,21 +31,26 @@ func serveVersion(t *testing.T, version string) http.HandlerFunc {
 func TestDoctorReportsAnOldRelease(t *testing.T) {
 	t.Parallel()
 
-	got := runCLI(t, serveVersion(t, "2.14.22"), "doctor")
+	got := runCLI(t, serveVersion(t, "2.16.28"), "doctor")
 	if got.err != nil {
 		t.Fatalf("doctor returned an unexpected error: %v", got.err)
 	}
 
 	for _, want := range []string{
-		"2.14",
-		"set-ready-for-review",
-		"set-work-in-progress",
+		"2.16",
 		"revert-submission",
-		"needs Gerrit 2.15+",
 		"needs Gerrit 3.2+",
 	} {
 		if !strings.Contains(got.stdout, want) {
 			t.Errorf("stdout does not mention %q:\n%s", want, got.stdout)
+		}
+	}
+
+	// Naming these here would mean naming them as unsupported; the floor has
+	// both endpoints.
+	for _, kept := range []string{"set-ready-for-review", "set-work-in-progress"} {
+		if strings.Contains(got.stdout, kept) {
+			t.Errorf("stdout lists %s, which a 2.16 host can run:\n%s", kept, got.stdout)
 		}
 	}
 }

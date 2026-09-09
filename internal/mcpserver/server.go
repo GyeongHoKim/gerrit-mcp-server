@@ -74,9 +74,7 @@ func writeTools() []toolRegistrar {
 // A function rather than a package-level map, for the reason readTools is one.
 func minVersions() map[string]gerrit.ServerVersion {
 	return map[string]gerrit.ServerVersion{
-		"set_work_in_progress": gerrit.MinVersionWorkInProgress,
-		"set_ready_for_review": gerrit.MinVersionWorkInProgress,
-		"revert_submission":    gerrit.MinVersionRevertSubmission,
+		"revert_submission": gerrit.MinVersionRevertSubmission,
 	}
 }
 

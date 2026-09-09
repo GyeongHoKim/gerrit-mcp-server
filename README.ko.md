@@ -228,8 +228,8 @@ CLI와 MCP 서버 둘 다 command 와 tool이 1:1 대응관계입니다. 예를 
 | `delete_draft_comments` | 변경 사항의 모든 초안 삭제 |
 | `add_reviewer` | 리뷰어 또는 참조(CC) 추가 |
 | `set_topic` | 토픽 설정 또는 삭제 |
-| `set_ready_for_review` | 변경 사항을 WIP 상태에서 해제 (Gerrit 2.15+ 필요) |
-| `set_work_in_progress` | 변경 사항을 WIP로 표시 (Gerrit 2.15+ 필요) |
+| `set_ready_for_review` | 변경 사항을 WIP 상태에서 해제 |
+| `set_work_in_progress` | 변경 사항을 WIP로 표시 |
 | `create_change` | 변경 사항 생성 |
 | `abandon_change` | 변경 사항 abandon |
 | `revert_change` | 변경 사항 되돌리기 |
@@ -251,14 +251,12 @@ CLI와 MCP 서버 둘 다 command 와 tool이 1:1 대응관계입니다. 예를 
 
 ## Supported Gerrit versions
 
-Gerrit **3.14** REST API를 기준으로 빌드하고 테스트했으며, **2.14**까지 지원합니다.
+Gerrit **3.14** REST API를 기준으로 빌드하고 테스트했으며, 공식 Docker 이미지가 있는 가장 오래된 릴리스인 **2.16**까지 지원합니다.
 
-오래된 호스트에서도 거의 모든 기능이 그대로 동작합니다. 이 문서가 예전에 지목했던 초안 댓글 엔드포인트도 포함해서요. 실제로 존재하지 않는 것은 쓰기 작업 세 개뿐입니다.
+오래된 호스트에서도 거의 모든 기능이 그대로 동작합니다. 이 문서가 예전에 지목했던 초안 댓글 엔드포인트도 포함해서요. 실제로 존재하지 않는 것은 쓰기 작업 하나뿐입니다.
 
 | 작업 | 필요 버전 |
 | --- | --- |
-| `set_work_in_progress` / `set-work-in-progress` | Gerrit 2.15+ |
-| `set_ready_for_review` / `set-ready-for-review` | Gerrit 2.15+ |
 | `revert_submission` / `revert-submission` | Gerrit 3.2+ |
 
 두 프론트엔드는 이를 쓰기 권한과 같은 방식으로 처리합니다. `gerrit-mcp-server`는 시작할 때 호스트에 릴리스를 물어보고 제공할 수 없는 툴은 아예 등록하지 않으므로, 클라이언트가 처음 물어보는 순간부터 툴 목록이 정확합니다. `gerrit-cli`는 각 명령에 필요한 릴리스를 함께 표시하고, 그래도 실행하면 필요한 릴리스와 호스트가 보고한 릴리스를 모두 알려주며 exit 4로 종료합니다.

@@ -449,18 +449,6 @@ type gatedAction struct {
 // so that a reader can see the claim being tested without looking it up.
 func gatedActions() map[string]gatedAction {
 	return map[string]gatedAction{
-		"SetWorkInProgress": {
-			call: func(ctx context.Context, c *Client) error {
-				return c.SetWorkInProgress(ctx, "12345", "")
-			},
-			min: MinVersionWorkInProgress,
-		},
-		"SetReadyForReview": {
-			call: func(ctx context.Context, c *Client) error {
-				return c.SetReadyForReview(ctx, "12345", "")
-			},
-			min: MinVersionWorkInProgress,
-		},
 		"RevertSubmission": {
 			call: func(ctx context.Context, c *Client) error {
 				_, err := c.RevertSubmission(ctx, "12345", "")
@@ -472,8 +460,9 @@ func gatedActions() map[string]gatedAction {
 	}
 }
 
-// A 2.14 host has none of these endpoints, so its 404 means the endpoint was
-// never there and the caller is told which release would have it.
+// A 2.16 host, the oldest supported, has none of these endpoints, so its 404
+// means the endpoint was never there and the caller is told which release
+// would have it.
 func TestGatedActionsReportAnOldServer(t *testing.T) {
 	t.Parallel()
 
@@ -481,7 +470,7 @@ func TestGatedActionsReportAnOldServer(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			client := newTestClient(t, serveGerritOfVersion(t, "2.14.22"))
+			client := newTestClient(t, serveGerritOfVersion(t, "2.16.28"))
 
 			err := action.call(t.Context(), client)
 			if !errors.Is(err, ErrUnsupportedByServer) {
@@ -490,7 +479,7 @@ func TestGatedActionsReportAnOldServer(t *testing.T) {
 
 			// Both numbers, because either alone leaves the reader guessing
 			// what to do about it.
-			for _, want := range []string{action.min.String(), "2.14"} {
+			for _, want := range []string{action.min.String(), "2.16"} {
 				if !strings.Contains(err.Error(), want) {
 					t.Errorf("%s error = %q, want it to name %q", name, err, want)
 				}
@@ -576,5 +565,37 @@ func TestGatedActionsDoNotProbeOnSuccess(t *testing.T) {
 
 	if got := requests.Load(); got != 1 {
 		t.Errorf("requests = %d, want 1", got)
+	}
+}
+
+// The floor has /wip and /ready, so a 404 from either is a change that does
+// not exist, not a host that is too old. There is no gate left to fire.
+func TestWorkInProgressIsNotGatedOnTheFloor(t *testing.T) {
+	t.Parallel()
+
+	calls := map[string]func(context.Context, *Client) error{
+		"SetWorkInProgress": func(ctx context.Context, c *Client) error {
+			return c.SetWorkInProgress(ctx, "12345", "")
+		},
+		"SetReadyForReview": func(ctx context.Context, c *Client) error {
+			return c.SetReadyForReview(ctx, "12345", "")
+		},
+	}
+
+	for name, call := range calls {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			client := newTestClient(t, serveGerritOfVersion(t, "2.16.28"))
+
+			err := call(t.Context(), client)
+			if !errors.Is(err, ErrNotFound) {
+				t.Fatalf("%s error = %v, want ErrNotFound", name, err)
+			}
+
+			if errors.Is(err, ErrUnsupportedByServer) {
+				t.Errorf("%s reported the host as too old: %v", name, err)
+			}
+		})
 	}
 }

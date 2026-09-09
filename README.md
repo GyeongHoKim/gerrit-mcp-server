@@ -265,8 +265,8 @@ responses inside a sensible token budget, and handing an agent raw Gerrit JSON w
 | `delete_draft_comments` | Delete every draft on a change |
 | `add_reviewer` | Add a reviewer or CC |
 | `set_topic` | Set or clear the topic |
-| `set_ready_for_review` | Take a change out of WIP (needs Gerrit 2.15+) |
-| `set_work_in_progress` | Mark a change WIP (needs Gerrit 2.15+) |
+| `set_ready_for_review` | Take a change out of WIP |
+| `set_work_in_progress` | Mark a change WIP |
 | `create_change` | Create a change |
 | `abandon_change` | Abandon a change |
 | `revert_change` | Revert a change |
@@ -289,15 +289,14 @@ stdout and everything else to stderr, so the answer is safe to pipe.
 
 ## Supported Gerrit versions
 
-Built and tested against the Gerrit **3.14** REST API. Supported down to **2.14**.
+Built and tested against the Gerrit **3.14** REST API. Supported down to **2.16**, the oldest
+release with an official Docker image.
 
 Almost everything works unchanged on an old host — including the draft comment endpoints, which
-earlier versions of this document blamed. Three write operations genuinely do not exist:
+earlier versions of this document blamed. One write operation genuinely does not exist:
 
 | Operation | Needs |
 | --- | --- |
-| `set_work_in_progress` / `set-work-in-progress` | Gerrit 2.15+ |
-| `set_ready_for_review` / `set-ready-for-review` | Gerrit 2.15+ |
 | `revert_submission` / `revert-submission` | Gerrit 3.2+ |
 
 The two frontends handle that the same way they handle write access. `gerrit-mcp-server` asks the

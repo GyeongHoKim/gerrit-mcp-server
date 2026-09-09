@@ -83,9 +83,7 @@ func TestWriteCommandsRunWithTheOptIn(t *testing.T) {
 // The commands that carry a minimum version, and the flags that reach them.
 func versionGatedInvocations() map[string][]string {
 	return map[string][]string{
-		"set-work-in-progress": {"--change-id", "12345"},
-		"set-ready-for-review": {"--change-id", "12345"},
-		"revert-submission":    {"--change-id", "12345"},
+		"revert-submission": {"--change-id", "12345"},
 	}
 }
 
@@ -106,7 +104,7 @@ func TestVersionGatedCommandsReportAnOldServer(t *testing.T) {
 					return
 				}
 
-				if _, err := w.Write([]byte(")]}'\n\"2.14.22\"")); err != nil {
+				if _, err := w.Write([]byte(")]}'\n\"2.16.28\"")); err != nil {
 					t.Errorf("writing test response: %v", err)
 				}
 			}
@@ -123,7 +121,7 @@ func TestVersionGatedCommandsReportAnOldServer(t *testing.T) {
 
 			// Both releases: the one the command needs and the one the host
 			// admits to. Either alone leaves the reader without the next step.
-			for _, want := range []string{"2.14", "or newer"} {
+			for _, want := range []string{"2.16", "or newer"} {
 				if !strings.Contains(got.err.Error(), want) {
 					t.Errorf("%s error = %q, want it to mention %q", name, got.err, want)
 				}

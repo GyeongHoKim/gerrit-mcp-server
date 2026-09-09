@@ -15,16 +15,7 @@ func TestUnsupportedTools(t *testing.T) {
 		want    []string
 		running gerrit.ServerVersion
 	}{
-		// The oldest supported release: no work-in-progress state, and no
-		// reverting a whole submission.
-		"2.14": {
-			running: gerrit.ServerVersion{Major: 2, Minor: 14},
-			want:    []string{"revert_submission", "set_ready_for_review", "set_work_in_progress"},
-		},
-		"2.15 gained work in progress": {
-			running: gerrit.ServerVersion{Major: 2, Minor: 15},
-			want:    []string{"revert_submission"},
-		},
+		// The oldest supported release: no reverting a whole submission.
 		"2.16": {
 			running: gerrit.ServerVersion{Major: 2, Minor: 16},
 			want:    []string{"revert_submission"},

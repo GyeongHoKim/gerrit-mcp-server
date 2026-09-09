@@ -120,10 +120,9 @@ The status says what to do next. Read it before retrying.
 change, and cannot upload a patchset. For those, point the user at the web UI or
 at `git push origin HEAD:refs/for/<branch>`.
 
-Three commands need a Gerrit newer than the 2.14 floor and exit 4 on an older
-host, naming the release they need:
+One command needs a Gerrit newer than the 2.16 floor and exits 4 on an older
+host, naming the release it needs:
 
-- `set-work-in-progress` and `set-ready-for-review` need **2.15+**
 - `revert-submission` needs **3.2+**
 
 Nothing about the command will fix that; point the user at the web UI. Run

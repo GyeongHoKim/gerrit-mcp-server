@@ -39,28 +39,15 @@ type MessageInput struct {
 	Message string `json:"message,omitempty"`
 }
 
-// MinVersionWorkInProgress is the first Gerrit with /wip and /ready.
-//
-// Work-in-progress is a state 2.15 introduced; before it there was nothing for
-// these endpoints to set. A var rather than a const only because
-// [ServerVersion] is a struct -- nothing assigns to it.
-//
-//nolint:mnd // a release number is the constant, not a magic one
-var MinVersionWorkInProgress = ServerVersion{Major: 2, Minor: 15}
-
 // SetReadyForReview takes a change out of work-in-progress and notifies its
 // reviewers.
 func (c *Client) SetReadyForReview(ctx context.Context, changeID, message string) error {
-	err := c.postMessage(ctx, changeID, "/ready", message)
-
-	return c.unsupportedIfOlder(ctx, err, MinVersionWorkInProgress)
+	return c.postMessage(ctx, changeID, "/ready", message)
 }
 
 // SetWorkInProgress marks a change as not yet asking for review.
 func (c *Client) SetWorkInProgress(ctx context.Context, changeID, message string) error {
-	err := c.postMessage(ctx, changeID, "/wip", message)
-
-	return c.unsupportedIfOlder(ctx, err, MinVersionWorkInProgress)
+	return c.postMessage(ctx, changeID, "/wip", message)
 }
 
 // postMessage posts an action that takes nothing but an optional note and

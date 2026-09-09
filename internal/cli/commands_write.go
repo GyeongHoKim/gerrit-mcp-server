@@ -279,7 +279,7 @@ func setTopic() Command {
 
 // setReadyForReview marks a change ready.
 func setReadyForReview() Command {
-	return since(gerrit.MinVersionWorkInProgress, changeMessageCommand(
+	return changeMessageCommand(
 		"set-ready-for-review",
 		"Take a change out of work-in-progress and notify its reviewers.",
 		"optional note posted on the change explaining the action",
@@ -290,12 +290,12 @@ func setReadyForReview() Command {
 
 			return emit(deps.Options.Stdout, render.ReadyForReviewSet(changeID))
 		},
-	))
+	)
 }
 
 // setWorkInProgress marks a change work-in-progress.
 func setWorkInProgress() Command {
-	return since(gerrit.MinVersionWorkInProgress, changeMessageCommand(
+	return changeMessageCommand(
 		"set-work-in-progress",
 		"Mark a change work-in-progress so it stops asking for attention.",
 		"optional note posted on the change explaining the action",
@@ -306,7 +306,7 @@ func setWorkInProgress() Command {
 
 			return emit(deps.Options.Stdout, render.WorkInProgressSet(changeID))
 		},
-	))
+	)
 }
 
 // abandonChange abandons a change.
