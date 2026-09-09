@@ -137,7 +137,7 @@ func writeSection(body *strings.Builder, title string, commands []Command, width
 //
 // A version note is a suffix rather than a section of its own, because which
 // Gerrit a command needs is orthogonal to whether it writes: sectioning by
-// both would cut the list into four groups to mark three commands. Summary
+// both would cut the list into four groups to mark one command. Summary
 // itself is left alone so that it stays the one sentence describing what the
 // command does.
 func summaryOf(command Command) string {

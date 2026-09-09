@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/GyeongHoKim/gerrit-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/GyeongHoKim/gerrit-mcp-server/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@gyeonghokim/gerrit-mcp-server)](https://www.npmjs.com/package/@gyeonghokim/gerrit-mcp-server)
-[![Go](https://img.shields.io/badge/go-1.26-00ADD8)](https://go.dev)
+[![Go](https://img.shields.io/badge/go-1.27-00ADD8)](https://go.dev)
 [![License](https://img.shields.io/badge/license-Elastic--2.0-005571)](LICENSE)
 
 AI 코딩 에이전트를 Gerrit Code Review 시스템에 연결할 수 있습니다.
@@ -14,7 +14,7 @@ AI 코딩 에이전트를 Gerrit Code Review 시스템에 연결할 수 있습�
 | | 설명 | 컨텍스트 비용 |
 | --- | --- | --- |
 | **`gerrit-cli` + 스킬** | 명령줄 바이너리와, 이를 사용하도록 에이전트를 가르치는 [에이전트 스킬](skills/gerrit-cli/SKILL.md) | 스킬이 실행되기 전까지 한 줄 |
-| **`gerrit-mcp-server`** | **stdio**를 사용하는 [Model Context Protocol](https://modelcontextprotocol.io) 서버 | 전체 세션 동안 22개의 툴 스키마 |
+| **`gerrit-mcp-server`** | **stdio**를 사용하는 [Model Context Protocol](https://modelcontextprotocol.io) 서버 | 전체 세션 동안 23개의 툴 스키마 |
 
 스킬 방식은 더 가볍고 스킬을 읽는 모든 에이전트에서 동작합니다. MCP 서버는 셸 접근이 필요 없으며 Claude Code, Codex, Cursor, Zed, Continue 또는 직접 만든 MCP 클라이언트에서 사용할 수 있습니다.
 
@@ -210,6 +210,7 @@ CLI와 MCP 서버 둘 다 command 와 tool이 1:1 대응관계입니다. 예를 
 | `get_file_diff` | 변경 사항에 포함된 파일 하나의 diff |
 | `list_change_comments` | 변경 사항에 게시된 댓글 |
 | `list_draft_comments` | 내가 작성했지만 아직 게시하지 않은 초안 댓글 |
+| `list_change_messages` | 변경 사항의 Change Log 메시지 (자동 생성 메시지 포함) |
 | `changes_submitted_together` | 이 변경 사항과 함께 제출될 변경 사항 |
 | `suggest_reviewers` | 변경 사항의 리뷰어 추천 |
 | `get_bugs_from_cl` | 커밋 메시지에서 참조한 버그 ID |
@@ -228,8 +229,8 @@ CLI와 MCP 서버 둘 다 command 와 tool이 1:1 대응관계입니다. 예를 
 | `delete_draft_comments` | 변경 사항의 모든 초안 삭제 |
 | `add_reviewer` | 리뷰어 또는 참조(CC) 추가 |
 | `set_topic` | 토픽 설정 또는 삭제 |
-| `set_ready_for_review` | 변경 사항을 WIP 상태에서 해제 (Gerrit 2.15+ 필요) |
-| `set_work_in_progress` | 변경 사항을 WIP로 표시 (Gerrit 2.15+ 필요) |
+| `set_ready_for_review` | 변경 사항을 WIP 상태에서 해제 |
+| `set_work_in_progress` | 변경 사항을 WIP로 표시 |
 | `create_change` | 변경 사항 생성 |
 | `abandon_change` | 변경 사항 abandon |
 | `revert_change` | 변경 사항 되돌리기 |
@@ -251,14 +252,12 @@ CLI와 MCP 서버 둘 다 command 와 tool이 1:1 대응관계입니다. 예를 
 
 ## Supported Gerrit versions
 
-Gerrit **3.14** REST API를 기준으로 빌드하고 테스트했으며, **2.14**까지 지원합니다.
+Gerrit **3.14** REST API를 기준으로 빌드하고 테스트했으며, 공식 Docker 이미지가 있는 가장 오래된 릴리스인 **2.16**까지 지원합니다.
 
-오래된 호스트에서도 거의 모든 기능이 그대로 동작합니다. 이 문서가 예전에 지목했던 초안 댓글 엔드포인트도 포함해서요. 실제로 존재하지 않는 것은 쓰기 작업 세 개뿐입니다.
+오래된 호스트에서도 거의 모든 기능이 그대로 동작합니다. 이 문서가 예전에 지목했던 초안 댓글 엔드포인트도 포함해서요. 실제로 존재하지 않는 것은 쓰기 작업 하나뿐입니다.
 
 | 작업 | 필요 버전 |
 | --- | --- |
-| `set_work_in_progress` / `set-work-in-progress` | Gerrit 2.15+ |
-| `set_ready_for_review` / `set-ready-for-review` | Gerrit 2.15+ |
 | `revert_submission` / `revert-submission` | Gerrit 3.2+ |
 
 두 프론트엔드는 이를 쓰기 권한과 같은 방식으로 처리합니다. `gerrit-mcp-server`는 시작할 때 호스트에 릴리스를 물어보고 제공할 수 없는 툴은 아예 등록하지 않으므로, 클라이언트가 처음 물어보는 순간부터 툴 목록이 정확합니다. `gerrit-cli`는 각 명령에 필요한 릴리스를 함께 표시하고, 그래도 실행하면 필요한 릴리스와 호스트가 보고한 릴리스를 모두 알려주며 exit 4로 종료합니다.

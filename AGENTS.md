@@ -12,7 +12,7 @@ Two Go binaries over one Gerrit REST client, distributed together on npm.
   MCP server's tool schemas sit in a model's context for a whole session, and a skill costs one
   line until it triggers.
 
-They expose the same 22 operations from the same packages, and `internal/mcpserver/parity_test.go`
+They expose the same 23 operations from the same packages, and `internal/mcpserver/parity_test.go`
 holds them to that.
 
 **Stdout means different things in the two binaries, and getting it wrong is fatal in one of them.**
@@ -108,7 +108,7 @@ functions rather than package-level slices for the same reason: a var could be a
 anywhere in the package.
 
 **A minimum Gerrit version is declared once and associated twice.** The release itself goes in
-`internal/gerrit`, beside the endpoint that needs it (`MinVersionWorkInProgress` in `actions.go`),
+`internal/gerrit`, beside the endpoint that needs it (`MinVersionRevertSubmission` in `actions.go`),
 because it is a fact about the Gerrit API. Which operation calls that endpoint is a fact about a
 frontend, so `minVersions()` in `internal/mcpserver` and `since(...)` in `internal/cli` each state
 their own — and `parity_test.go` holds the two equal, the same way it holds the inventory.
@@ -137,11 +137,10 @@ reference is the AsciiDoc in `doc/` — run `just fetch-gerrit-docs` to get it.
   escaped path segment — but escaping an id Gerrit handed you turns `%2F` into `%252F` and 404s a
   change that plainly exists. `changePath` unescapes before escaping so both forms work.
 - **Not every endpoint exists on every version.** We build and test against 3.14 and support
-  **2.14+**. Only three operations are actually missing on an older host: `/wip` and `/ready`
-  arrived in 2.15, `/revert_submission` in 3.2. Draft comment endpoints are *not* among them —
-  they work on 2.14 — and neither is anything else in the inventory. The inventory comes from
-  Gerrit's own release notes; the floor itself has not been exercised against a real 2.14 host,
-  and what that leaves unverified is under [Testing](#testing).
+  **2.16+**, the oldest release with an official Docker image. Only one operation is actually
+  missing on an older host: `/revert_submission`, which arrived in 3.2. Draft comment endpoints
+  work on 2.16, and so does everything else in the inventory — including `/messages`, which is
+  why the floor is 2.16 and not 2.14. The inventory comes from Gerrit's own release notes.
 - **`GET /changes/{id}/message` is 3.x only.** It hands back footers Gerrit parsed for you, which
   is why it is tempting. `GET /changes/{id}/revisions/{rev}/commit` answers the same question on
   every supported release, so `GetCommitMessage` uses that one and `parseFooters` reads the git
@@ -192,16 +191,14 @@ Do not use `--no-verify`. If a hook is wrong, fix the hook.
   is shaped the way it is.
 - Tests run with `-race` in CI on Linux, macOS and Windows.
 - **Version behaviour is covered by stubs that report an old release.** A handler answering
-  `"2.14.22"` is indistinguishable from a real 2.14 for everything this client does, because the
-  only things the code reads are that string and the 404s. The floor itself cannot be run here —
-  official Docker images start around 2.16 — so a change to the version logic is verified by adding
-  a case to `ParseServerVersion`'s table and to the 404-conversion tests, not by standing up a
-  container. That table is an inventory of strings seen in the wild; add to it rather than
-  inventing cases.
-- One assumption rests on nothing we can execute: that a 2.14 host answers **404**, not 405 or 400,
-  for an endpoint it never had. Fail-open contains the damage either way — a non-404 stays whatever
-  Gerrit said — but the "too old" diagnosis simply would not fire. Confirm it against a real 2.14
-  host before claiming the floor in a release.
+  `"2.16.28"` is indistinguishable from a real 2.16 for everything this client does, because the
+  only things the code reads are that string and the 404s. A change to the version logic is
+  verified by adding a case to `ParseServerVersion`'s table and to the 404-conversion tests. That
+  table is an inventory of strings seen in the wild; add to it rather than inventing cases.
+- One assumption is not exercised by the unit tests: that a 2.16 host answers **404**, not 405 or
+  400, for an endpoint it never had. Fail-open contains the damage either way — a non-404 stays
+  whatever Gerrit said — but the "too old" diagnosis simply would not fire. The `gerritcodereview/gerrit:2.16.28`
+  image exists, so confirm it against a container before claiming the floor in a release.
 
 ## Releasing
 

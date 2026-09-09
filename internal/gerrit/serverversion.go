@@ -155,7 +155,7 @@ func (c *Client) GetServerVersion(ctx context.Context) (ServerVersion, error) {
 // unsupportedIfOlder rewrites a failure that turned out to mean the host is
 // too old for the endpoint, and leaves every other failure alone.
 //
-// The status cannot say so by itself: POST /changes/999/wip answers 404 both
+// The status cannot say so by itself: POST /changes/999/revert_submission answers 404 both
 // for a change that does not exist and for a Gerrit that does not have the
 // endpoint. Guessing from the 404 would send someone who mistyped a change
 // number off to read release notes, and would report "ask a human" for

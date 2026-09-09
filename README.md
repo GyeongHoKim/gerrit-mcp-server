@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/GyeongHoKim/gerrit-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/GyeongHoKim/gerrit-mcp-server/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@gyeonghokim/gerrit-mcp-server)](https://www.npmjs.com/package/@gyeonghokim/gerrit-mcp-server)
-[![Go](https://img.shields.io/badge/go-1.26-00ADD8)](https://go.dev)
+[![Go](https://img.shields.io/badge/go-1.27-00ADD8)](https://go.dev)
 [![License](https://img.shields.io/badge/license-Elastic--2.0-005571)](LICENSE)
 
 Connect your AI coding agent to Gerrit code review.
@@ -18,7 +18,7 @@ you want to spend:
 | | What it is | Context cost |
 | --- | --- | --- |
 | **`gerrit-cli` + skill** | A command-line binary, plus an [agent skill](skills/gerrit-cli/SKILL.md) that teaches an agent to drive it | One line, until the skill triggers |
-| **`gerrit-mcp-server`** | A [Model Context Protocol](https://modelcontextprotocol.io) server over **stdio** | 22 tool schemas, for the whole session |
+| **`gerrit-mcp-server`** | A [Model Context Protocol](https://modelcontextprotocol.io) server over **stdio** | 23 tool schemas, for the whole session |
 
 The skill route is the lighter one and works with any agent that reads skills. The MCP server needs
 no shell access and works with any MCP client: Claude Code, Codex, Cursor, Zed, Continue, or your
@@ -242,6 +242,7 @@ The same asymmetry applies to operations your Gerrit is too old for — see
 | `get_file_diff` | Diff for one file in a change |
 | `list_change_comments` | Published comments on a change |
 | `list_draft_comments` | Your unpublished draft comments |
+| `list_change_messages` | Change Log messages on a change, automated ones included |
 | `changes_submitted_together` | Changes that would submit alongside this one |
 | `suggest_reviewers` | Reviewer suggestions for a change |
 | `get_bugs_from_cl` | Bug ids referenced in the commit message |
@@ -265,8 +266,8 @@ responses inside a sensible token budget, and handing an agent raw Gerrit JSON w
 | `delete_draft_comments` | Delete every draft on a change |
 | `add_reviewer` | Add a reviewer or CC |
 | `set_topic` | Set or clear the topic |
-| `set_ready_for_review` | Take a change out of WIP (needs Gerrit 2.15+) |
-| `set_work_in_progress` | Mark a change WIP (needs Gerrit 2.15+) |
+| `set_ready_for_review` | Take a change out of WIP |
+| `set_work_in_progress` | Mark a change WIP |
 | `create_change` | Create a change |
 | `abandon_change` | Abandon a change |
 | `revert_change` | Revert a change |
@@ -289,15 +290,14 @@ stdout and everything else to stderr, so the answer is safe to pipe.
 
 ## Supported Gerrit versions
 
-Built and tested against the Gerrit **3.14** REST API. Supported down to **2.14**.
+Built and tested against the Gerrit **3.14** REST API. Supported down to **2.16**, the oldest
+release with an official Docker image.
 
 Almost everything works unchanged on an old host — including the draft comment endpoints, which
-earlier versions of this document blamed. Three write operations genuinely do not exist:
+earlier versions of this document blamed. One write operation genuinely does not exist:
 
 | Operation | Needs |
 | --- | --- |
-| `set_work_in_progress` / `set-work-in-progress` | Gerrit 2.15+ |
-| `set_ready_for_review` / `set-ready-for-review` | Gerrit 2.15+ |
 | `revert_submission` / `revert-submission` | Gerrit 3.2+ |
 
 The two frontends handle that the same way they handle write access. `gerrit-mcp-server` asks the

@@ -366,20 +366,20 @@ func toolNames(t *testing.T, session *mcp.ClientSession) []string {
 func TestServeHidesToolsAnOldGerritCannotServe(t *testing.T) {
 	t.Parallel()
 
-	served := startServe(t, envAgainst(t, "2.14.22"), io.Discard)
+	served := startServe(t, envAgainst(t, "2.16.28"), io.Discard)
 
 	got := toolNames(t, served.session)
 
-	for _, gone := range []string{"revert_submission", "set_work_in_progress", "set_ready_for_review"} {
-		if slices.Contains(got, gone) {
-			t.Errorf("%s is still offered by a 2.14 server", gone)
-		}
+	if slices.Contains(got, "revert_submission") {
+		t.Errorf("revert_submission is still offered by a 2.16 server")
 	}
 
 	// The rest of the write set is untouched. A prune that took the whole
 	// group would be indistinguishable from one that worked, from the outside.
-	if !slices.Contains(got, "abandon_change") {
-		t.Errorf("abandon_change was pruned; it works on every supported version")
+	for _, kept := range []string{"abandon_change", "set_work_in_progress", "set_ready_for_review"} {
+		if !slices.Contains(got, kept) {
+			t.Errorf("%s was pruned; it works on every supported version", kept)
+		}
 	}
 
 	if stopErr := served.stop(t); stopErr != nil {

@@ -125,6 +125,7 @@ func readCommands() []Command {
 		getFileDiff(),
 		listChangeComments(),
 		listDraftComments(),
+		listChangeMessages(),
 		changesSubmittedTogether(),
 		suggestReviewers(),
 		getBugsFromCL(),

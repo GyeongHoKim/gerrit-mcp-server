@@ -194,6 +194,29 @@ func (s *server) listDraftComments(
 	return text(render.Drafts(byFile)), nil, nil
 }
 
+// registerListChangeMessages installs the list_change_messages tool.
+func registerListChangeMessages(s *server, srv *mcp.Server) {
+	mcp.AddTool(srv, &mcp.Tool{
+		Name:        "list_change_messages",
+		Description: "List the Change Log messages on a Gerrit change, including automated messages.",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, s.listChangeMessages)
+}
+
+// listChangeMessages lists a change's log, automated entries included.
+func (s *server) listChangeMessages(
+	ctx context.Context,
+	_ *mcp.CallToolRequest,
+	in changeIDInput,
+) (*mcp.CallToolResult, any, error) {
+	messages, err := s.gerrit.ListChangeMessages(ctx, in.ChangeID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("listing change messages on %s: %w", in.ChangeID, err)
+	}
+
+	return text(render.Messages(messages)), nil, nil
+}
+
 // registerChangesSubmittedTogether installs the changes_submitted_together tool.
 func registerChangesSubmittedTogether(s *server, srv *mcp.Server) {
 	mcp.AddTool(srv, &mcp.Tool{

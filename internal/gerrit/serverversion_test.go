@@ -22,7 +22,8 @@ func TestParseServerVersion(t *testing.T) {
 		wantErr bool
 	}{
 		"a release":                 {raw: "3.14.1", want: ServerVersion{Major: 3, Minor: 14}},
-		"the oldest supported":      {raw: "2.14.22", want: ServerVersion{Major: 2, Minor: 14}},
+		"a release below the floor": {raw: "2.14.22", want: ServerVersion{Major: 2, Minor: 14}},
+		"the oldest supported":      {raw: "2.16.28", want: ServerVersion{Major: 2, Minor: 16}},
 		"major and minor only":      {raw: "2.16", want: ServerVersion{Major: 2, Minor: 16}},
 		"a build off a tag":         {raw: "3.9.1-1234-gabcdef", want: ServerVersion{Major: 3, Minor: 9}},
 		"a vendor patch level":      {raw: "3.10.0.1", want: ServerVersion{Major: 3, Minor: 10}},

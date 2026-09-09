@@ -22,6 +22,7 @@ var (
 		"get_file_diff",
 		"list_change_comments",
 		"list_change_files",
+		"list_change_messages",
 		"list_draft_comments",
 		"query_changes",
 		"suggest_reviewers",
