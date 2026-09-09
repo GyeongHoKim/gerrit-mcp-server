@@ -146,6 +146,22 @@ func listDraftComments() Command {
 	)
 }
 
+// listChangeMessages lists a change's log, automated entries included.
+func listChangeMessages() Command {
+	return changeCommand(
+		"list-change-messages",
+		"List the Change Log messages, including automated ones.",
+		func(ctx context.Context, deps Deps, changeID string) error {
+			messages, err := deps.Gerrit.ListChangeMessages(ctx, changeID)
+			if err != nil {
+				return fmt.Errorf("listing change messages on %s: %w", changeID, err)
+			}
+
+			return emit(deps.Options.Stdout, render.Messages(messages))
+		},
+	)
+}
+
 // changesSubmittedTogether lists the changes that submit alongside one.
 func changesSubmittedTogether() Command {
 	return changeCommand(

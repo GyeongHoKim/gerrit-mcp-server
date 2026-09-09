@@ -18,7 +18,7 @@ you want to spend:
 | | What it is | Context cost |
 | --- | --- | --- |
 | **`gerrit-cli` + skill** | A command-line binary, plus an [agent skill](skills/gerrit-cli/SKILL.md) that teaches an agent to drive it | One line, until the skill triggers |
-| **`gerrit-mcp-server`** | A [Model Context Protocol](https://modelcontextprotocol.io) server over **stdio** | 22 tool schemas, for the whole session |
+| **`gerrit-mcp-server`** | A [Model Context Protocol](https://modelcontextprotocol.io) server over **stdio** | 23 tool schemas, for the whole session |
 
 The skill route is the lighter one and works with any agent that reads skills. The MCP server needs
 no shell access and works with any MCP client: Claude Code, Codex, Cursor, Zed, Continue, or your
@@ -242,6 +242,7 @@ The same asymmetry applies to operations your Gerrit is too old for — see
 | `get_file_diff` | Diff for one file in a change |
 | `list_change_comments` | Published comments on a change |
 | `list_draft_comments` | Your unpublished draft comments |
+| `list_change_messages` | Change Log messages on a change, automated ones included |
 | `changes_submitted_together` | Changes that would submit alongside this one |
 | `suggest_reviewers` | Reviewer suggestions for a change |
 | `get_bugs_from_cl` | Bug ids referenced in the commit message |

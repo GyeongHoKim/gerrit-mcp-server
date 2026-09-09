@@ -39,6 +39,7 @@ func readTools() []toolRegistrar {
 		registerGetFileDiff,
 		registerListChangeComments,
 		registerListDraftComments,
+		registerListChangeMessages,
 		registerChangesSubmittedTogether,
 		registerSuggestReviewers,
 		registerGetBugsFromCL,

@@ -53,9 +53,10 @@ gerrit-cli query-changes --query "is:open reviewer:self -owner:self"
 **Read a change**
 
 ```bash
-gerrit-cli get-change-details --change-id 12345
-gerrit-cli list-change-files  --change-id 12345
-gerrit-cli get-file-diff      --change-id 12345 --file src/main.go
+gerrit-cli get-change-details   --change-id 12345
+gerrit-cli list-change-files    --change-id 12345
+gerrit-cli get-file-diff        --change-id 12345 --file src/main.go
+gerrit-cli list-change-messages --change-id 12345   # the Change Log, bots included
 ```
 
 **Leave a review.** Comments are staged as drafts and are invisible to anyone

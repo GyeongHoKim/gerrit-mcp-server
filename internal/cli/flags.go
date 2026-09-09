@@ -86,8 +86,8 @@ func changeIDFlag(flags *flag.FlagSet) *string {
 
 // changeCommand builds one of the commands whose only argument is a change id.
 //
-// Nine commands have exactly this shape. Writing the binding out nine times
-// would be nine chances for the flag name or its usage text to drift.
+// Ten commands have exactly this shape. Writing the binding out ten times
+// would be ten chances for the flag name or its usage text to drift.
 func changeCommand(
 	name, summary string,
 	act func(ctx context.Context, deps Deps, changeID string) error,

@@ -14,7 +14,7 @@ AI 코딩 에이전트를 Gerrit Code Review 시스템에 연결할 수 있습�
 | | 설명 | 컨텍스트 비용 |
 | --- | --- | --- |
 | **`gerrit-cli` + 스킬** | 명령줄 바이너리와, 이를 사용하도록 에이전트를 가르치는 [에이전트 스킬](skills/gerrit-cli/SKILL.md) | 스킬이 실행되기 전까지 한 줄 |
-| **`gerrit-mcp-server`** | **stdio**를 사용하는 [Model Context Protocol](https://modelcontextprotocol.io) 서버 | 전체 세션 동안 22개의 툴 스키마 |
+| **`gerrit-mcp-server`** | **stdio**를 사용하는 [Model Context Protocol](https://modelcontextprotocol.io) 서버 | 전체 세션 동안 23개의 툴 스키마 |
 
 스킬 방식은 더 가볍고 스킬을 읽는 모든 에이전트에서 동작합니다. MCP 서버는 셸 접근이 필요 없으며 Claude Code, Codex, Cursor, Zed, Continue 또는 직접 만든 MCP 클라이언트에서 사용할 수 있습니다.
 
@@ -210,6 +210,7 @@ CLI와 MCP 서버 둘 다 command 와 tool이 1:1 대응관계입니다. 예를 
 | `get_file_diff` | 변경 사항에 포함된 파일 하나의 diff |
 | `list_change_comments` | 변경 사항에 게시된 댓글 |
 | `list_draft_comments` | 내가 작성했지만 아직 게시하지 않은 초안 댓글 |
+| `list_change_messages` | 변경 사항의 Change Log 메시지 (자동 생성 메시지 포함) |
 | `changes_submitted_together` | 이 변경 사항과 함께 제출될 변경 사항 |
 | `suggest_reviewers` | 변경 사항의 리뷰어 추천 |
 | `get_bugs_from_cl` | 커밋 메시지에서 참조한 버그 ID |

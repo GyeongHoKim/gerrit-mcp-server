@@ -12,7 +12,7 @@ Two Go binaries over one Gerrit REST client, distributed together on npm.
   MCP server's tool schemas sit in a model's context for a whole session, and a skill costs one
   line until it triggers.
 
-They expose the same 22 operations from the same packages, and `internal/mcpserver/parity_test.go`
+They expose the same 23 operations from the same packages, and `internal/mcpserver/parity_test.go`
 holds them to that.
 
 **Stdout means different things in the two binaries, and getting it wrong is fatal in one of them.**
