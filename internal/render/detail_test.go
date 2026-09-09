@@ -15,17 +15,15 @@ func TestChangeDetail(t *testing.T) {
 	// change, with no comment counts in the payload. It is built from the same
 	// literal below so that the two goldens can only differ by that line.
 	full := &gerrit.ChangeDetail{
-		ChangeInfo: gerrit.ChangeInfo{
-			Number:     12345,
-			Project:    "platform/base",
-			Branch:     "main",
-			Subject:    "fix the widget alignment",
-			Status:     "NEW",
-			Updated:    at(t, "2026-07-31 06:04:05.000000000"),
-			Owner:      gerrit.AccountInfo{Name: "Alice Adams", AccountID: 1},
-			Insertions: 42,
-			Deletions:  3,
-		},
+		Number:                 12345,
+		Project:                "platform/base",
+		Branch:                 "main",
+		Subject:                "fix the widget alignment",
+		Status:                 "NEW",
+		Updated:                at(t, "2026-07-31 06:04:05.000000000"),
+		Owner:                  gerrit.AccountInfo{Name: "Alice Adams", AccountID: 1},
+		Insertions:             42,
+		Deletions:              3,
 		ChangeID:               "I8473b95934b5732ac55d26311a706c9c2bde9940",
 		TotalCommentCount:      new(5),
 		UnresolvedCommentCount: new(2),
@@ -33,14 +31,14 @@ func TestChangeDetail(t *testing.T) {
 			// Deliberately out of alphabetical order: the rendering has to
 			// sort, or the output changes between runs.
 			"Verified": {All: []gerrit.ApprovalInfo{
-				{AccountInfo: gerrit.AccountInfo{Name: "CI Bot", AccountID: 9}, Value: 1},
+				{Name: "CI Bot", AccountID: 9, Value: 1},
 			}},
 			"Code-Review": {All: []gerrit.ApprovalInfo{
-				{AccountInfo: gerrit.AccountInfo{Name: "Bob Brown", AccountID: 2}, Value: 2},
-				{AccountInfo: gerrit.AccountInfo{Name: "Carol Chen", AccountID: 3}, Value: -1},
+				{Name: "Bob Brown", AccountID: 2, Value: 2},
+				{Name: "Carol Chen", AccountID: 3, Value: -1},
 				// A zero vote means the reviewer has not scored, so it is
 				// noise rather than information.
-				{AccountInfo: gerrit.AccountInfo{Name: "Dave Davis", AccountID: 4}, Value: 0},
+				{Name: "Dave Davis", AccountID: 4, Value: 0},
 			}},
 		},
 		Reviewers: map[string][]gerrit.AccountInfo{
@@ -135,7 +133,7 @@ func TestChangeDetailSortsLabelsDeterministically(t *testing.T) {
 	t.Parallel()
 
 	detail := &gerrit.ChangeDetail{
-		ChangeInfo: gerrit.ChangeInfo{Number: 1, Project: "p", Branch: "main", Subject: "s", Status: "NEW"},
+		Number: 1, Project: "p", Branch: "main", Subject: "s", Status: "NEW",
 		Labels: map[string]gerrit.LabelInfo{
 			"Zeta": {}, "Alpha": {}, "Mu": {},
 		},

@@ -352,7 +352,10 @@ func TestLoadInvalidKeepsTheParsersOwnError(t *testing.T) {
 
 		_, err := config.Load(lookupFrom(with(map[string]string{config.EnvURL: "https://gerrit example.com"})))
 
+		// errors.AsType would read better, but its discarded first return is
+		// an error value, which errcheck's check-blank rejects.
 		var urlErr *url.Error
+		//nolint:modernize // see above: the AsType rewrite trips errcheck.
 		if !errors.As(err, &urlErr) {
 			t.Errorf("Load() error = %v, want it to carry a *url.Error", err)
 		}

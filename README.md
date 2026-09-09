@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/GyeongHoKim/gerrit-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/GyeongHoKim/gerrit-mcp-server/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@gyeonghokim/gerrit-mcp-server)](https://www.npmjs.com/package/@gyeonghokim/gerrit-mcp-server)
-[![Go](https://img.shields.io/badge/go-1.26-00ADD8)](https://go.dev)
+[![Go](https://img.shields.io/badge/go-1.27-00ADD8)](https://go.dev)
 [![License](https://img.shields.io/badge/license-Elastic--2.0-005571)](LICENSE)
 
 Connect your AI coding agent to Gerrit code review.
