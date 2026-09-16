@@ -167,10 +167,31 @@ func New(opts Options) *Client {
 
 	return &Client{
 		baseURL:    opts.BaseURL,
-		httpClient: &http.Client{Timeout: opts.Timeout},
+		httpClient: &http.Client{Timeout: opts.Timeout, Transport: newTransport()},
 		user:       opts.User,
 		token:      opts.Token,
 	}
+}
+
+// newTransport returns a transport this client alone owns.
+//
+// A nil Transport selects http.DefaultTransport, which is shared with every
+// other http.Client in the process that also left it nil. CloseIdleConnections
+// on that global closes connections its caller never opened, so a client on
+// the default cannot be isolated from unrelated code in the same program.
+//
+// Cloning rather than building an empty transport keeps what the default is
+// configured with -- proxy resolution from the environment above all, which an
+// internal Gerrit is routinely behind -- and drops only the sharing. The
+// fallthrough is unreachable today and costs one line: a standard library that
+// no longer backs DefaultTransport with *http.Transport gets a plain transport
+// instead of a panic.
+func newTransport() http.RoundTripper {
+	if transport, ok := http.DefaultTransport.(*http.Transport); ok {
+		return transport.Clone()
+	}
+
+	return &http.Transport{}
 }
 
 // changePath returns the API path for a change, escaping the id.
