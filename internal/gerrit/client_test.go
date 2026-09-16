@@ -43,12 +43,22 @@ func newTestClientWithTimeout(t *testing.T, timeout time.Duration, handler http.
 		t.Fatalf("parsing test server url: %v", err)
 	}
 
-	return New(Options{
+	client := New(Options{
 		BaseURL: base,
 		User:    testUser,
 		Token:   testToken,
 		Timeout: timeout,
 	})
+
+	// [New] gave this client a transport of its own; closing it keeps a test's
+	// idle connections from outliving the test that opened them. t.Cleanup is
+	// LIFO, so this runs before the server's own cleanup and the client side
+	// closes first, the way a caller would.
+	if transport, ok := client.httpClient.Transport.(*http.Transport); ok {
+		t.Cleanup(transport.CloseIdleConnections)
+	}
+
+	return client
 }
 
 // writeOK replies with an empty object the way Gerrit does, XSSI guard and all.
@@ -59,6 +69,39 @@ func writeOK(t *testing.T, w http.ResponseWriter) {
 
 	if _, err := io.WriteString(w, xssiPrefix+"\n{}"); err != nil {
 		t.Errorf("writing test response: %v", err)
+	}
+}
+
+// TestNewGivesEachClientItsOwnTransport checks that [New] leaves no client on
+// the process-global http.DefaultTransport, and that no two clients end up on
+// one transport. A client on the shared default has its idle connections
+// closed by anything in the process that calls CloseIdleConnections, including
+// code that never opened them.
+//
+// The check belongs to [New] rather than to a test helper because callers
+// outside this package build their clients through it and cannot reach the
+// transport afterwards.
+func TestNewGivesEachClientItsOwnTransport(t *testing.T) {
+	t.Parallel()
+
+	base, err := url.Parse("https://gerrit.example.com")
+	if err != nil {
+		t.Fatalf("parsing base url: %v", err)
+	}
+
+	first := New(Options{BaseURL: base, User: testUser, Token: testToken})
+	second := New(Options{BaseURL: base, User: testUser, Token: testToken})
+
+	if first.httpClient.Transport == nil {
+		t.Fatal("New() left Transport nil, which selects http.DefaultTransport")
+	}
+
+	if first.httpClient.Transport == http.DefaultTransport {
+		t.Error("New() used http.DefaultTransport, want a transport of its own")
+	}
+
+	if first.httpClient.Transport == second.httpClient.Transport {
+		t.Error("two clients share one transport, want one each")
 	}
 }
 
