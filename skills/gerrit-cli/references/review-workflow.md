@@ -3,6 +3,31 @@
 How drafts, sides, line numbers and reply ids fit together. Getting these wrong
 is the usual reason a comment lands in the wrong place, or does not land at all.
 
+## Review context comes first
+
+For every request to review a change, summarize its review feedback, or decide
+what remains to be done, inspect the current patch set and both kinds of review
+feedback before drawing a conclusion:
+
+```bash
+gerrit-cli get-change-details   --change-id 12345
+gerrit-cli list-change-messages --change-id 12345
+gerrit-cli list-change-comments --change-id 12345
+gerrit-cli list-change-files    --change-id 12345
+gerrit-cli get-file-diff        --change-id 12345 --file src/main.go
+```
+
+`list-change-messages` is the Change Log. It can contain an overall review
+verdict, patch-set-level requests, a reviewer summary, and automated checks.
+`list-change-comments` contains the inline discussion tied to particular files
+and lines. Neither listing is a substitute for the other: do not determine the
+review state or required follow-up from inline comments alone.
+
+The commands above read the latest patch set. Interpret earlier feedback
+against the current diff and the later Change Messages. Before drafting a new
+inline comment, check both listings to avoid repeating a point that was already
+raised, answered, or addressed in a later patch set.
+
 ## Drafts are staged, then published
 
 `post-review-comment` creates a **draft**. Drafts are yours alone — nobody else

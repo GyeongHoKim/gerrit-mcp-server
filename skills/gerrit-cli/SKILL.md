@@ -50,14 +50,26 @@ A change is named by `--change-id`, which takes either the number from the URL
 gerrit-cli query-changes --query "is:open reviewer:self -owner:self"
 ```
 
-**Read a change**
+**Review a change**
+
+For every request to review, summarize, or act on a change's code review,
+collect the review context before reaching a conclusion or drafting a comment.
+Read both the Change Message and the inline comments: the Change Message holds
+the overall verdict, patch-set-level requests, and bot results; inline comments
+hold file- and line-specific discussion. Do not infer the review state or the
+required follow-up from inline comments alone.
 
 ```bash
 gerrit-cli get-change-details   --change-id 12345
+gerrit-cli list-change-messages --change-id 12345   # overall reviews and bots
+gerrit-cli list-change-comments --change-id 12345   # inline discussions
 gerrit-cli list-change-files    --change-id 12345
 gerrit-cli get-file-diff        --change-id 12345 --file src/main.go
-gerrit-cli list-change-messages --change-id 12345   # the Change Log, bots included
 ```
+
+Use the current patch set's diff together with both comment listings. Before
+adding a new inline comment, check whether a reviewer already raised the point
+or whether a later Change Message or patch set already addressed it.
 
 **Leave a review.** Comments are staged as drafts and are invisible to anyone
 else until published, so stage all of them first and publish once.
@@ -133,7 +145,7 @@ Nothing about the command will fix that; point the user at the web UI. Run
 
 - [Gerrit query syntax](references/query-syntax.md) — the operators
   `query-changes` accepts. Read this before writing a non-obvious query.
-- [The review workflow](references/review-workflow.md) — how drafts, sides,
-  line numbers and reply ids fit together.
+- [The review workflow](references/review-workflow.md) — how to collect review
+  context, then use drafts, sides, line numbers and reply ids correctly.
 - [Troubleshooting](references/troubleshooting.md) — what a 401, 403 or 404
   from Gerrit actually means.
