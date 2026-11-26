@@ -101,7 +101,6 @@ func (e *APIError) Error() string {
 // compile. The assertion below pins it.
 type errorMatcher interface{ Is(error) bool }
 
-//nolint:errcheck // check-blank reads the assertion as a discarded error; there is no call here
 var _ errorMatcher = (*APIError)(nil)
 
 // Is maps the HTTP status onto the package's sentinel errors so that callers

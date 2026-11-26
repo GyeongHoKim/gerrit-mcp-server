@@ -150,7 +150,7 @@ func wait(ctx context.Context, session *mcp.ServerSession, logger *slog.Logger) 
 		// The error is the session's own; a close that fails on the way out
 		// tells nobody anything they can act on.
 		_ = session.Close() //nolint:errcheck // see above
-		<-closed
+		<-closed            //nolint:errcheck // and its exit reason is that close
 	}
 }
 
