@@ -1,0 +1,57 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.GyeongHoKim/gerrit-mcp-server",
+  "title": "Gerrit",
+  "description": "Gerrit code review for AI agents: find changes, read diffs, draft comments and publish reviews.",
+  "repository": {
+    "url": "https://github.com/GyeongHoKim/gerrit-mcp-server",
+    "source": "github"
+  },
+  "version": "0.0.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@gyeonghokim/gerrit-mcp-server",
+      "version": "0.0.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "GERRIT_URL",
+          "description": "Base URL of the Gerrit host",
+          "placeholder": "https://gerrit.example.com",
+          "isRequired": true
+        },
+        {
+          "name": "GERRIT_USER",
+          "description": "Your Gerrit username",
+          "isRequired": true
+        },
+        {
+          "name": "GERRIT_TOKEN",
+          "description": "Auth token from Settings → HTTP Credentials",
+          "isRequired": true,
+          "isSecret": true
+        },
+        {
+          "name": "GERRIT_ALLOW_WRITE",
+          "description": "Set to true to enable the tools that modify Gerrit",
+          "format": "boolean",
+          "default": "false"
+        },
+        {
+          "name": "GERRIT_TIMEOUT",
+          "description": "Per-request timeout",
+          "default": "30s"
+        },
+        {
+          "name": "GERRIT_LOG_LEVEL",
+          "description": "Log level. Logs go to stderr",
+          "choices": ["debug", "info", "warn", "error"],
+          "default": "info"
+        }
+      ]
+    }
+  ]
+}

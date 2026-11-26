@@ -7,6 +7,9 @@ name: Release
 # The seven are five platform packages, each carrying both binaries, plus one
 # wrapper per frontend: @gyeonghokim/gerrit-mcp-server and
 # @gyeonghokim/gerrit-cli.
+#
+# The MCP server is then listed on the MCP Registry under the GitHub
+# namespace, which needs no setup beyond the id-token permission below.
 
 on:
   push:
@@ -52,6 +55,16 @@ jobs:
       - name: Check the assembled packages
         run: node scripts/check-npm-packages.mjs "${GITHUB_REF_NAME}"
 
+      # Also before the first publish. An upload that failed afterwards would
+      # fail this job with the packages already up, skip the registry job, and
+      # leave it nothing to re-run with.
+      - name: Hand the stamped server.json to the registry job
+        uses: actions/upload-artifact@v7
+        with:
+          name: server-json
+          path: dist/server.json
+          if-no-files-found: error
+
       # Platform packages go first: the wrapper pins them by exact version, so
       # publishing the wrapper first would leave a window where installing it
       # fails.
@@ -73,3 +86,43 @@ jobs:
             echo "publishing ${package}"
             npm publish "${package}" --provenance --access public
           done
+
+  # A job of its own so that it can be re-run alone. The registry checks the
+  # wrapper on npm, so this has to come after npm publish, and a failure here
+  # must not mean re-running a job whose npm publishes would now be refused.
+  mcp-registry:
+    name: Publish to the MCP Registry
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # mcp-publisher login github-oidc
+    env:
+      MCP_PUBLISHER_VERSION: v1.8.9
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: server-json
+
+      - uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+
+      - name: Download and verify mcp-publisher
+        run: |
+          set -euo pipefail
+          archive="mcp-publisher_linux_amd64.tar.gz"
+          base_url="https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}"
+
+          curl --fail --location --silent --show-error --output "$archive" "$base_url/$archive"
+          curl --fail --location --silent --show-error --output "$archive.sigstore.json" "$base_url/$archive.sigstore.json"
+          cosign verify-blob \
+            --bundle "$archive.sigstore.json" \
+            --certificate-identity "https://github.com/modelcontextprotocol/registry/.github/workflows/release.yml@refs/tags/${MCP_PUBLISHER_VERSION}" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            "$archive"
+          tar xzf "$archive" mcp-publisher
+
+      - name: Authenticate to the MCP Registry
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish server.json
+        run: ./mcp-publisher publish server.json
