@@ -56,14 +56,14 @@ func footerBlock(message string) string {
 	// would otherwise never match the blank line that separates paragraphs.
 	trimmed := strings.TrimRight(strings.ReplaceAll(message, "\r\n", "\n"), "\n")
 
-	index := strings.LastIndex(trimmed, "\n\n")
-	if index < 0 {
+	// Any further blank lines are left in the block and skipped as
+	// non-trailer lines by the caller.
+	_, block, found := strings.CutLast(trimmed, "\n\n")
+	if !found {
 		return ""
 	}
 
-	// Past the second newline. Any further blank lines are left in the block
-	// and skipped as non-trailer lines by the caller.
-	return trimmed[index+2:]
+	return block
 }
 
 // footer is one parsed trailer line. A struct rather than two strings back,
