@@ -138,6 +138,20 @@ async function buildWrapperPackage(wrapper, version, platformNames) {
   await copyFile(path.join(ROOT, "README.md"), path.join(dir, "README.md"));
 }
 
+// The MCP Registry entry points at the server wrapper on npm, so it carries
+// the same version. The copy in git says 0.0.0, like the package.json files;
+// the stamped one goes to dist/ and is what the release publishes.
+async function buildServerJson(version) {
+  const server = JSON.parse(await readFile(path.join(ROOT, "server.json"), "utf8"));
+
+  server.version = version;
+  for (const pkg of server.packages) {
+    pkg.version = version;
+  }
+
+  await writeFile(path.join(DIST, "server.json"), `${JSON.stringify(server, null, 2)}\n`);
+}
+
 async function main() {
   const version = await resolveVersion(process.argv[2], ROOT);
   const artifacts = await readBinaryArtifacts();
@@ -153,6 +167,8 @@ async function main() {
   for (const wrapper of WRAPPERS) {
     await buildWrapperPackage(wrapper, version, names);
   }
+
+  await buildServerJson(version);
 
   const total = names.length + WRAPPERS.length;
 

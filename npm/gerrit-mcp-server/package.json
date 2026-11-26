@@ -1,6 +1,7 @@
 {
   "name": "@gyeonghokim/gerrit-mcp-server",
   "version": "0.0.0",
+  "mcpName": "io.github.GyeongHoKim/gerrit-mcp-server",
   "description": "Model Context Protocol server for Gerrit code review. Point any MCP-capable agent at your Gerrit host.",
   "license": "Elastic-2.0",
   "author": "GyeongHoKim",

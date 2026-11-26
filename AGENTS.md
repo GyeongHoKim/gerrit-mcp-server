@@ -220,6 +220,15 @@ already up, which is a release nobody can install and nobody can redo. Configure
 before tagging. `scripts/check-npm-packages.mjs` catches what it can before the first publish, but
 it cannot see whether a trusted publisher exists.
 
+**The MCP server is also listed on the [MCP Registry](https://registry.modelcontextprotocol.io).**
+A second job, `mcp-registry`, publishes `server.json` once the npm packages are up, because the
+registry verifies the entry against the wrapper on npm: the wrapper's `mcpName` must equal the
+entry's `name`, and `check-npm-packages.mjs` holds them equal before anything is published. It
+authenticates with GitHub OIDC under the `io.github.GyeongHoKim` namespace, so nothing needs
+configuring. If that job fails, re-run it alone; the npm job cannot be redone. `server.json` in git
+says `0.0.0` like every `package.json` here, and `build-npm-packages.mjs` stamps the real version
+into `dist/server.json`.
+
 Adding a platform means touching `scripts/platforms.mjs`, `.goreleaser.yaml`, the `PACKAGES` table
 in **every** `npm/*/bin/cli.js`, and registering a trusted publisher for the new package.
 

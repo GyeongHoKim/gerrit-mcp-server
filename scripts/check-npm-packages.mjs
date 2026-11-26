@@ -98,12 +98,63 @@ async function checkWrapperPackages(problems, version) {
   }
 }
 
+// The registry accepts an npm package only if its package.json names the
+// registry entry in mcpName. The registry step runs after npm publish, and a
+// mismatch found there means a version already on npm that the registry will
+// never list.
+async function checkServerJson(problems, version) {
+  const file = path.join(ROOT, "dist", "server.json");
+
+  let server;
+  try {
+    server = JSON.parse(await readFile(file, "utf8"));
+  } catch {
+    throw new Error(`${file} is missing. Run \`just npm-build\` first.`);
+  }
+
+  check(
+    problems,
+    server.description.length <= 100,
+    `server.json description is ${server.description.length} characters, the registry allows 100`,
+  );
+
+  check(
+    problems,
+    server.version === version,
+    `server.json is version ${server.version}, want ${version}`,
+  );
+
+  for (const pkg of server.packages) {
+    const wrapper = WRAPPERS.find((w) => w.name === pkg.identifier);
+
+    if (wrapper === undefined) {
+      problems.push(`server.json lists ${pkg.identifier}, which is not a wrapper we publish`);
+      continue;
+    }
+
+    const manifest = await readManifest(wrapper.dir);
+
+    check(
+      problems,
+      manifest.mcpName === server.name,
+      `${wrapper.dir} has mcpName ${manifest.mcpName ?? "unset"}, want ${server.name}`,
+    );
+
+    check(
+      problems,
+      pkg.version === version,
+      `server.json lists ${pkg.identifier} at ${pkg.version}, want ${version}`,
+    );
+  }
+}
+
 async function main() {
   const version = await resolveVersion(process.argv[2], ROOT);
   const problems = [];
 
   await checkPlatformPackages(problems, version);
   await checkWrapperPackages(problems, version);
+  await checkServerJson(problems, version);
 
   if (problems.length > 0) {
     throw new Error(`the assembled packages are not publishable:\n  ${problems.join("\n  ")}`);
