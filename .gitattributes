@@ -1,3 +1,8 @@
+# Every text file is LF in the repository and in every checkout, whatever
+# core.autocrlf says. .editorconfig asks editors for the same, but only git
+# can refuse a CRLF that an editor or a script let through.
+* text=auto eol=lf
+
 # Golden files are compared byte for byte against what render produces, and
 # render always emits LF. A Windows checkout with core.autocrlf=true -- which is
 # what the GitHub runner image ships -- would rewrite every one of those bytes
