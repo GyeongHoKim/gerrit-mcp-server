@@ -121,6 +121,26 @@ jobs:
             "$archive"
           tar xzf "$archive" mcp-publisher
 
+      # npm accepts a publish minutes before it serves the version, and the
+      # registry rejects an entry whose npm version it cannot fetch yet. Before
+      # login, so the token is not spent on the wait.
+      - name: Wait for the npm packages to appear
+        run: |
+          set -euo pipefail
+          jq -r '.packages[] | select(.registryType == "npm") | "\(.identifier)/\(.version)"' server.json |
+            while read -r package; do
+              for attempt in $(seq 1 30); do
+                if curl --fail --silent --connect-timeout 10 --max-time 20 --output /dev/null "https://registry.npmjs.org/${package}"; then
+                  echo "${package} is on npm"
+                  continue 2
+                fi
+                echo "${package} not on npm yet (attempt ${attempt}/30)"
+                sleep 30
+              done
+              echo "::error::${package} did not appear on npm after 30 attempts"
+              exit 1
+            done
+
       - name: Authenticate to the MCP Registry
         run: ./mcp-publisher login github-oidc
 

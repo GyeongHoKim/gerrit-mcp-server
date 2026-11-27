@@ -225,9 +225,10 @@ A second job, `mcp-registry`, publishes `server.json` once the npm packages are 
 registry verifies the entry against the wrapper on npm: the wrapper's `mcpName` must equal the
 entry's `name`, and `check-npm-packages.mjs` holds them equal before anything is published. It
 authenticates with GitHub OIDC under the `io.github.GyeongHoKim` namespace, so nothing needs
-configuring. If that job fails, re-run it alone; the npm job cannot be redone. `server.json` in git
-says `0.0.0` like every `package.json` here, and `build-npm-packages.mjs` stamps the real version
-into `dist/server.json`.
+configuring. npm serves a new version minutes after accepting it, so the job waits up to 15
+minutes for it before publishing. If that job fails, re-run it alone; the npm job cannot be redone.
+`server.json` in git says `0.0.0` like every `package.json` here, and `build-npm-packages.mjs`
+stamps the real version into `dist/server.json`.
 
 Adding a platform means touching `scripts/platforms.mjs`, `.goreleaser.yaml`, the `PACKAGES` table
 in **every** `npm/*/bin/cli.js`, and registering a trusted publisher for the new package.
